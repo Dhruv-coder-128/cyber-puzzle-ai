@@ -199,6 +199,9 @@ const StorageManager = {
         }
         return false;
     },
+    saveBestScore(moves, time) {
+        return this.saveBest(State.gridSize, time, moves);
+    },
     updateBestDisplay() {
         const best = State.bestScores[State.gridSize];
         if(best) {
@@ -407,34 +410,60 @@ const VisionManager = {
             const rawCx = (thumbX + indexX) / 2;
             const rawCy = (thumbY + indexY) / 2;
 
-            // --- SPIKE REJECTION ---
-            const spikeThresh = Math.max(Els.canvas.width, Els.canvas.height) * 0.25;
-            const posDelta = Math.hypot(rawCx - State.handPrevCx, rawCy - State.handPrevCy);
-            const isSpike = State.hand.exists && posDelta > spikeThresh;
-
-            if (!isSpike) {
+            // --- ADAPTIVE EMA SMOOTHING & SPIKE REJECTION ---
+            const spikeThresh = Math.max(Els.canvas.width, Els.canvas.height) * 0.28;
+            if (!State.hand.exists) {
                 State.hand.cx = rawCx;
                 State.hand.cy = rawCy;
                 State.handPrevCx = rawCx;
                 State.handPrevCy = rawCy;
+            } else {
+                const delta = Math.hypot(rawCx - State.handPrevCx, rawCy - State.handPrevCy);
+                if (delta <= spikeThresh) {
+                    // Responsive dynamic alpha: 0.28 on still hover (zero jitter), 0.72 on fast sweeps
+                    const alpha = Math.min(0.72, Math.max(0.28, delta / 65));
+                    State.hand.cx += (rawCx - State.hand.cx) * alpha;
+                    State.hand.cy += (rawCy - State.hand.cy) * alpha;
+                    State.handPrevCx = State.hand.cx;
+                    State.handPrevCy = State.hand.cy;
+                }
             }
 
             State.hand.exists = true;
             State.handLostFrames = 0;
             
-            const distPx = Math.hypot(thumbX - indexX, thumbY - indexY);
-            const refDim = Math.max(Els.canvas.width, Els.canvas.height);
-            
-            const currentThresh = State.hand.isPinched ? Config.PINCH_RELEASE_THRESH : Config.PINCH_START_THRESH;
-            State.hand.isPinched = (distPx / refDim) < currentThresh;
+            // --- SCALE-INVARIANT PINCH DETECTION ---
+            // Distance between wrist (0) and middle MCP (9) represents physical palm size
+            const palmScale = Math.hypot(lm[9].x - lm[0].x, lm[9].y - lm[0].y) || 0.24;
+            const pinchRatio = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y) / palmScale;
+
+            // Hysteresis threshold: 0.32 to engage pinch, 0.48 to disengage
+            const isPinchedCandidate = pinchRatio < (State.hand.isPinched ? 0.48 : 0.32);
+
+            // 2-frame confirmation to eliminate 1-frame tracking noise/flicker
+            if (isPinchedCandidate) {
+                State.pinchEngageCount = (State.pinchEngageCount || 0) + 1;
+                State.pinchReleaseCount = 0;
+                if (State.pinchEngageCount >= 2) {
+                    State.hand.isPinched = true;
+                }
+            } else {
+                State.pinchReleaseCount = (State.pinchReleaseCount || 0) + 1;
+                State.pinchEngageCount = 0;
+                if (State.pinchReleaseCount >= 2) {
+                    State.hand.isPinched = false;
+                }
+            }
             
             latestResults = results;
         } else {
-            // Hand not detected this frame.
+            // Hand not detected this frame
             State.handLostFrames++;
             if (State.handLostFrames > State.handLostTolerance) {
                 State.hand.exists = false;
                 State.hand.isPinched = false;
+                State.pinchEngageCount = 0;
+                State.pinchReleaseCount = 0;
                 latestResults = null;
             }
         }
@@ -696,16 +725,28 @@ const PuzzleEngine = {
         
         const originalC1 = tile1.c;
         const originalR1 = tile1.r;
+        const b = this.getBoardBounds();
         
+        // Update logical positions
         tile1.c = targetCell.c;
         tile1.r = targetCell.r;
+        
+        // Continuous visual offset for tile1 snapping into targetCell
+        tile1.dragOffset.x += (originalC1 - targetCell.c) * b.tw;
+        tile1.dragOffset.y += (originalR1 - targetCell.r) * b.th;
+        tile1.vx = -tile1.dragOffset.x * 6;
+        tile1.vy = -tile1.dragOffset.y * 6;
         
         if (tile2) {
             tile2.c = originalC1;
             tile2.r = originalR1;
-            // animate tile2 snapping to its new spot
-            const b = this.getBoardBounds();
-            tile2.dragOffset = {x: (targetCell.c - originalC1) * b.tw, y: (targetCell.r - originalR1) * b.th};
+            // Animate tile2 snapping to its new spot
+            tile2.dragOffset = {
+                x: (targetCell.c - originalC1) * b.tw,
+                y: (targetCell.r - originalR1) * b.th
+            };
+            tile2.vx = -tile2.dragOffset.x * 6;
+            tile2.vy = -tile2.dragOffset.y * 6;
         }
         
         State.moves++;
@@ -719,29 +760,47 @@ const PuzzleEngine = {
         const tile1 = State.tiles.find(t => t.id === last.t1);
         const tile2 = last.t2 !== null ? State.tiles.find(t => t.id === last.t2) : null;
         
-        tile1.c = last.from1.c;
-        tile1.r = last.from1.r;
-        
-        const b = this.getBoardBounds();
-        tile1.dragOffset = {x: (last.target.c - last.from1.c) * b.tw, y: (last.target.r - last.from1.r) * b.th};
+        if (tile1) {
+            tile1.c = last.from1.c;
+            tile1.r = last.from1.r;
+            const b = this.getBoardBounds();
+            tile1.dragOffset = {x: (last.target.c - last.from1.c) * b.tw, y: (last.target.r - last.from1.r) * b.th};
+            tile1.vx = -tile1.dragOffset.x * 6;
+            tile1.vy = -tile1.dragOffset.y * 6;
+        }
         
         if (tile2) {
             tile2.c = last.from2.c;
             tile2.r = last.from2.r;
+            const b = this.getBoardBounds();
             tile2.dragOffset = {x: (last.target.c - last.from2.c) * b.tw, y: (last.target.r - last.from2.r) * b.th};
+            tile2.vx = -tile2.dragOffset.x * 6;
+            tile2.vy = -tile2.dragOffset.y * 6;
         }
         
         State.moves++;
         UIManager.updateStats();
         AudioEngine.playDrop();
         if(State.history.length === 0) Els.undo.disabled = true;
+        this.checkWin();
+    },
+    isPuzzleSolved() {
+        if (!State.tiles || State.tiles.length === 0) return false;
+        const expectedCount = State.gridSize * State.gridSize;
+        if (State.tiles.length !== expectedCount) return false;
+        return State.tiles.every(t => t.c === t.origC && t.r === t.origR);
     },
     checkWin() {
-        const win = State.tiles.every(t => t.c === t.origC && t.r === t.origR);
-        if (win) {
+        if (State.mode !== 'PLAYING') return;
+        if (this.isPuzzleSolved()) {
             State.mode = 'SOLVED';
             clearInterval(State.timerInterval);
-            const isBest = StorageManager.saveBestScore(State.moves, State.elapsed);
+            
+            // Release any lingering drag or selection state
+            State.isPinching = false;
+            State.selectedTile = null;
+            
+            const isBest = StorageManager.saveBest(State.gridSize, State.elapsed, State.moves);
             UIManager.showWinScreen(isBest);
             AudioEngine.playWin();
             
@@ -846,7 +905,7 @@ const RenderEngine = {
             });
         }
         
-        // 3. Hands & Interaction (Soft Mint Technical Overlay)
+        // 3. Hands & Interaction (High-Visibility Cyber Tech Overlay)
         if (latestResults && latestResults.multiHandLandmarks) {
             Els.ctx.save();
             if (State.cameraFacingMode === 'user') {
@@ -854,35 +913,74 @@ const RenderEngine = {
                 Els.ctx.scale(-1, 1);
             }
             for (const lm of latestResults.multiHandLandmarks) {
+                // High-contrast cyber-mint skeleton connections
                 if (typeof drawConnectors !== 'undefined') {
-                    drawConnectors(Els.ctx, lm, HAND_CONNECTIONS, {color: 'rgba(99, 230, 190, 0.22)', lineWidth: 1.2});
+                    const isPinched = State.hand.isPinched;
+                    const lineColor = isPinched ? 'rgba(99, 230, 190, 0.75)' : 'rgba(99, 230, 190, 0.45)';
+                    const lineWidth = isPinched ? 2.4 : 1.6;
+                    drawConnectors(Els.ctx, lm, HAND_CONNECTIONS, {color: lineColor, lineWidth: lineWidth});
                 }
-                lm.forEach(pt => {
+                
+                // Tech landmark joints
+                lm.forEach((pt, idx) => {
+                    const px = pt.x * Els.canvas.width;
+                    const py = pt.y * Els.canvas.height;
+                    const isFingertip = (idx === 4 || idx === 8);
+                    
+                    // Outer halo
                     Els.ctx.beginPath();
-                    Els.ctx.arc(pt.x * Els.canvas.width, pt.y * Els.canvas.height, 5.5, 0, 2*Math.PI);
-                    Els.ctx.fillStyle = 'rgba(99, 230, 190, 0.2)'; Els.ctx.fill();
+                    Els.ctx.arc(px, py, isFingertip ? 6.5 : 4.5, 0, 2 * Math.PI);
+                    Els.ctx.fillStyle = State.hand.isPinched 
+                        ? (isFingertip ? 'rgba(245, 184, 75, 0.35)' : 'rgba(99, 230, 190, 0.28)')
+                        : 'rgba(99, 230, 190, 0.22)';
+                    Els.ctx.fill();
+                    
+                    // Core point
                     Els.ctx.beginPath();
-                    Els.ctx.arc(pt.x * Els.canvas.width, pt.y * Els.canvas.height, 2.2, 0, 2*Math.PI);
-                    Els.ctx.fillStyle = '#63E6BE'; Els.ctx.fill();
+                    Els.ctx.arc(px, py, isFingertip ? 3.5 : 2.5, 0, 2 * Math.PI);
+                    Els.ctx.fillStyle = State.hand.isPinched 
+                        ? (isFingertip ? '#F5B84B' : '#63E6BE') 
+                        : '#63E6BE';
+                    Els.ctx.fill();
                 });
             }
             Els.ctx.restore();
         }
         
+        // 4. Interaction Reticle / Cursor (drawn in canvas coordinates)
         if ((State.mode === 'CAPTURE' || State.mode === 'PLAYING') && State.hand.exists) {
-            const threshold = Math.max(Els.canvas.width, Els.canvas.height) * 0.04;
+            const isGrabbing = State.hand.isPinched && State.selectedTile;
+            const isPinching = State.hand.isPinched;
+            const radius = Math.max(Els.canvas.width, Els.canvas.height) * 0.035;
+            
+            Els.ctx.save();
+            // Outer Reticle
             Els.ctx.beginPath();
-            Els.ctx.arc(State.hand.cx, State.hand.cy, threshold, 0, 2*Math.PI);
-            Els.ctx.strokeStyle = State.hand.isPinched ? 'rgba(99, 230, 190, 0.9)' : 'rgba(99, 230, 190, 0.25)';
-            Els.ctx.lineWidth = State.hand.isPinched ? 2.5 : 1;
+            Els.ctx.arc(State.hand.cx, State.hand.cy, radius, 0, 2 * Math.PI);
+            Els.ctx.strokeStyle = isGrabbing 
+                ? 'rgba(245, 184, 75, 0.95)' 
+                : (isPinching ? 'rgba(99, 230, 190, 0.95)' : 'rgba(99, 230, 190, 0.55)');
+            Els.ctx.lineWidth = isPinching ? 2.5 : 1.5;
             Els.ctx.stroke();
+            
+            // Inner glow/fill if active
+            if (isPinching) {
+                Els.ctx.beginPath();
+                Els.ctx.arc(State.hand.cx, State.hand.cy, radius, 0, 2 * Math.PI);
+                Els.ctx.fillStyle = isGrabbing ? 'rgba(245, 184, 75, 0.15)' : 'rgba(99, 230, 190, 0.15)';
+                Els.ctx.fill();
+            }
+            
+            // Center Focal Node
             Els.ctx.beginPath();
-            Els.ctx.arc(State.hand.cx, State.hand.cy, 3, 0, 2*Math.PI);
-            Els.ctx.fillStyle = State.hand.isPinched ? '#63E6BE' : 'rgba(99, 230, 190, 0.45)';
+            Els.ctx.arc(State.hand.cx, State.hand.cy, isPinching ? 4.5 : 3.5, 0, 2 * Math.PI);
+            Els.ctx.fillStyle = isGrabbing ? '#F5B84B' : '#63E6BE';
             Els.ctx.fill();
+            
+            Els.ctx.restore();
         }
         
-        // 4. Confetti
+        // 5. Confetti
         if (State.mode === 'SOLVED') {
             State.confetti.forEach(c => {
                 Els.ctx.save();
@@ -914,7 +1012,7 @@ function updateLogic(dt) {
     } else if (State.mode === 'PLAYING') {
         const b = PuzzleEngine.getBoardBounds();
         
-        // Spring physics
+        // Spring physics for all non-dragged tiles
         State.tiles.forEach(tile => {
             if (tile !== State.selectedTile) {
                 const fx = -Config.SPRING_STIFFNESS * tile.dragOffset.x - Config.SPRING_DAMPING * tile.vx;
@@ -926,65 +1024,52 @@ function updateLogic(dt) {
             }
         });
         
-        // If hand has been lost beyond tolerance, don't process drag
-        if (!State.hand.exists) return;
-        
-        // Drag logic (Free move) — with grab-offset, lerp smoothing, dead-zone & max-step clamping
-        if (State.hand.isPinched) {
+        // Active Hand / Mouse / Touch interaction
+        if (State.hand.exists && State.hand.isPinched) {
             if (!State.isPinching) {
                 // --- GRAB ONSET ---
                 State.isPinching = true;
                 State.selectedTile = PuzzleEngine.getTileAt(State.hand.cx, State.hand.cy);
                 if (State.selectedTile) {
                     AudioEngine.playGrab();
-                    // Record offset from hand position to the tile's top-left corner in canvas px.
-                    // This keeps the tile attached to the exact grab point, not snapping to center.
+                    // Anchor grab offset to cursor point
                     const tileTopLeftX = b.ox + State.selectedTile.c * b.tw + State.selectedTile.dragOffset.x;
                     const tileTopLeftY = b.oy + State.selectedTile.r * b.th + State.selectedTile.dragOffset.y;
                     State.grabOffset = { x: State.hand.cx - tileTopLeftX, y: State.hand.cy - tileTopLeftY };
-                    // Seed the smooth position at current real position to avoid a jump on first frame
                     State.smoothDragX = tileTopLeftX;
                     State.smoothDragY = tileTopLeftY;
                 }
             } else if (State.selectedTile) {
                 // --- DRAG UPDATE ---
-                // Raw target: where the tile's top-left should go based on hand + grab offset
                 const rawTargetX = State.hand.cx - State.grabOffset.x;
                 const rawTargetY = State.hand.cy - State.grabOffset.y;
 
-                // Adaptive lerp smoothing:
-                // Fast movement → higher factor (more responsive, follows quickly)
-                // Slow movement → lower factor (more stable, less jitter)
                 const moveDist = Math.hypot(rawTargetX - State.smoothDragX, rawTargetY - State.smoothDragY);
-                // Scale between 0.14 (slow/still) and 0.32 (fast), adapting to movement magnitude
-                const adaptiveFactor = Math.min(0.32, 0.14 + (moveDist / 80) * 0.18);
+                const adaptiveFactor = Math.min(0.45, 0.18 + (moveDist / 60) * 0.25);
                 State.smoothDragX += (rawTargetX - State.smoothDragX) * adaptiveFactor;
                 State.smoothDragY += (rawTargetY - State.smoothDragY) * adaptiveFactor;
 
-                // Compute how far the tile's current rendered top-left is from the smooth target
                 const currentX = b.ox + State.selectedTile.c * b.tw + State.selectedTile.dragOffset.x;
                 const currentY = b.oy + State.selectedTile.r * b.th + State.selectedTile.dragOffset.y;
 
                 let dx = State.smoothDragX - currentX;
                 let dy = State.smoothDragY - currentY;
 
-                // Dead-zone: ignore sub-2px micro-movements (hand tremor)
-                if (Math.abs(dx) < 2 && Math.abs(dy) < 2) return;
-
-                // Max-step clamp: prevent single-frame jumps from big tracking deltas
-                const maxStep = 18;
-                dx = Math.max(-maxStep, Math.min(maxStep, dx));
-                dy = Math.max(-maxStep, Math.min(maxStep, dy));
-
-                State.selectedTile.dragOffset.x += dx;
-                State.selectedTile.dragOffset.y += dy;
+                // Dead-zone for micro tremor
+                if (Math.abs(dx) > 1.5 || Math.abs(dy) > 1.5) {
+                    const maxStep = 24;
+                    dx = Math.max(-maxStep, Math.min(maxStep, dx));
+                    dy = Math.max(-maxStep, Math.min(maxStep, dy));
+                    State.selectedTile.dragOffset.x += dx;
+                    State.selectedTile.dragOffset.y += dy;
+                }
             }
         } else {
+            // Hand not pinched OR tracking lost -> Safely release grab and snap home / swap
             if (State.isPinching) {
-                // --- DROP & MAGNETIC SNAP ---
                 State.isPinching = false;
                 if (State.selectedTile) {
-                    // Determine drop target from the current centre of the dragged tile
+                    // Determine drop target from tile centre or hand position
                     const draggedCentreX = b.ox + State.selectedTile.c * b.tw + State.selectedTile.dragOffset.x + b.tw / 2;
                     const draggedCentreY = b.oy + State.selectedTile.r * b.th + State.selectedTile.dragOffset.y + b.th / 2;
                     const targetCell = PuzzleEngine.getCellAt(draggedCentreX, draggedCentreY)
@@ -992,19 +1077,7 @@ function updateLogic(dt) {
 
                     if (targetCell && (targetCell.c !== State.selectedTile.c || targetCell.r !== State.selectedTile.r)) {
                         PuzzleEngine.swapTiles(State.selectedTile, targetCell);
-
-                        // The tile is now at targetCell logically. Its dragOffset still reflects the
-                        // old visual position, so set it to the residual so spring snaps it home.
-                        State.selectedTile.dragOffset = {
-                            x: State.selectedTile.dragOffset.x - (targetCell.c - State.selectedTile.c) * b.tw,
-                            y: State.selectedTile.dragOffset.y - (targetCell.r - State.selectedTile.r) * b.th
-                        };
-                        // Give the tile a soft initial velocity toward zero so spring settles in ~120ms
-                        State.selectedTile.vx = -State.selectedTile.dragOffset.x * 8;
-                        State.selectedTile.vy = -State.selectedTile.dragOffset.y * 8;
                         PuzzleEngine.checkWin();
-                    } else {
-                        // Dropped on same cell — snap back cleanly via spring (vx/vy already 0)
                     }
                     State.selectedTile = null;
                 }
