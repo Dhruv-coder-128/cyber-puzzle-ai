@@ -91,6 +91,8 @@
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
                 </button>
 
+                
+
                 <div class="controls-separator" aria-hidden="true"></div>
 
                 <button id="restart-btn" class="btn btn-secondary">Restart</button>
@@ -161,14 +163,26 @@
                         Mouse &amp; Touch fallback supported
                     </li>
                 </ul>
+
+                <!-- Privacy & Photo Sharing Notice -->
+                <!-- <div class="privacy-notice-box">
+                    <div class="privacy-notice-icon">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    </div>
+                    <div class="privacy-notice-text">
+                        <p class="notice-main">Photos captured during this experience are sent to the creator.</p>
+                        <p class="notice-sub">You can disable photo sharing anytime from Settings.</p>
+                    </div>
+                </div> -->
+
                 <div class="overlay-actions">
                     <button id="debug-toggle-btn" class="btn btn-secondary btn-sm" title="Toggle QA Panel">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 0-14.14 0"/><path d="M4.93 19.07a10 10 0 0 0 14.14 0"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.22 4.22 1.42 1.42"/><path d="m18.36 18.36 1.42 1.42"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m4.22 19.78 1.42-1.42"/><path d="m18.36 5.64 1.42-1.42"/></svg>
                         Diagnostics
                     </button>
                     <button id="start-tutorial-btn" class="btn btn-primary btn-grow">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
-                        Initialize Camera
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                        Continue
                     </button>
                 </div>
             </div>
@@ -228,6 +242,36 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Settings modal -->
+            <!-- <div id="settings-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+                <div class="settings-card">
+                    <div class="settings-header">
+                        <div class="settings-header-left">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                            <h3 id="settings-title">Settings</h3>
+                        </div>
+                        <button id="settings-close-btn" class="btn btn-icon" title="Close" aria-label="Close">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </div>
+                    <div class="settings-body">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <span class="setting-label">PHOTO SHARING</span>
+                                <span class="setting-desc">Captured photos are sent to the creator through Telegram.</span>
+                            </div>
+                            <div class="setting-control">
+                                <label class="toggle-switch" for="photo-sharing-toggle">
+                                    <input type="checkbox" id="photo-sharing-toggle" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <span id="photo-sharing-status" class="toggle-status-text">ON</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div> -->
 
         </div><!-- /puzzle-panel -->
 

