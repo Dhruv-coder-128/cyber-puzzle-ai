@@ -58,49 +58,45 @@
 
             <!-- Controls — right -->
             <div class="controls">
-                <!-- Grid selector -->
-                <select id="difficulty-select" class="btn btn-ghost select-ctrl" title="Grid Size" aria-label="Grid Size">
-                    <option value="3">3×3</option>
-                    <option value="4">4×4</option>
-                    <option value="5">5×5</option>
-                </select>
+                <div class="controls-group controls-tools">
+                    <!-- Grid selector -->
+                    <select id="difficulty-select" class="btn btn-ghost select-ctrl" title="Grid Size" aria-label="Grid Size">
+                        <option value="3">3×3</option>
+                        <option value="4">4×4</option>
+                        <option value="5">5×5</option>
+                    </select>
 
-                <!-- Icon controls -->
-                <button id="undo-btn" class="btn btn-icon" title="Undo Move (Z)" aria-label="Undo">
-                    <!-- Undo icon -->
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
-                </button>
+                    <!-- Icon controls -->
+                    <button id="undo-btn" class="btn btn-icon" title="Undo Move (Z)" aria-label="Undo">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+                    </button>
 
-                <button id="hint-btn" class="btn btn-icon" title="Show Hint (H)" aria-label="Hint">
-                    <!-- Lightbulb icon -->
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
-                </button>
+                    <button id="hint-btn" class="btn btn-icon" title="Show Hint (H)" aria-label="Hint">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
+                    </button>
 
-                <button id="sound-btn" class="btn btn-icon" title="Toggle Sound" aria-label="Sound">
-                    <!-- Volume icon -->
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-                </button>
+                    <button id="sound-btn" class="btn btn-icon" title="Toggle Sound" aria-label="Sound">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                    </button>
 
-                <button id="cam-btn" class="btn btn-icon" title="Switch Camera" aria-label="Switch Camera">
-                    <!-- Camera flip icon -->
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7h-3a2 2 0 0 1-2-2V3"/><path d="M9 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/><path d="m14 3 6 4-6 4V3z"/><path d="m10 17-6-4 6-4v8z"/></svg>
-                </button>
+                    <button id="cam-btn" class="btn btn-icon" title="Switch Camera" aria-label="Switch Camera">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7h-3a2 2 0 0 1-2-2V3"/><path d="M9 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/><path d="m14 3 6 4-6 4V3z"/><path d="m10 17-6-4 6-4v8z"/></svg>
+                    </button>
 
-                <button id="fullscreen-btn" class="btn btn-icon" title="Fullscreen" aria-label="Fullscreen">
-                    <!-- Fullscreen icon -->
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
-                </button>
-
-                
+                    <button id="fullscreen-btn" class="btn btn-icon" title="Fullscreen" aria-label="Fullscreen">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+                    </button>
+                </div>
 
                 <div class="controls-separator" aria-hidden="true"></div>
 
-                <button id="restart-btn" class="btn btn-secondary">Restart</button>
-                <button id="new-capture-btn" class="btn btn-primary">
-                    <!-- Camera icon -->
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
-                    New Capture
-                </button>
+                <div class="controls-group controls-actions">
+                    <button id="restart-btn" class="btn btn-secondary">Restart</button>
+                    <button id="new-capture-btn" class="btn btn-primary">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+                        <span>New Capture</span>
+                    </button>
+                </div>
             </div>
 
         </div>

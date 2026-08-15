@@ -253,9 +253,15 @@ const VisionManager = {
             Els.video.srcObject.getTracks().forEach(t => t.stop());
         }
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { width: 1280, height: 720, facingMode: State.cameraFacingMode }
-            });
+            const constraints = {
+                video: { 
+                    width: { ideal: 1280 }, 
+                    height: { ideal: 720 }, 
+                    facingMode: State.cameraFacingMode 
+                },
+                audio: false
+            };
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
             Els.video.srcObject = stream;
             
             // Wait for metadata to ensure video dimensions are known
@@ -909,8 +915,23 @@ const UIManager = {
         });
         Els.cam.addEventListener('click', () => { AudioEngine.playClick(); VisionManager.toggleCamera(); });
         Els.fs.addEventListener('click', () => {
-            if(!document.fullscreenElement) document.documentElement.requestFullscreen();
-            else document.exitFullscreen();
+            try {
+                if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                    if (document.documentElement.requestFullscreen) {
+                        document.documentElement.requestFullscreen().catch(() => {});
+                    } else if (document.documentElement.webkitRequestFullscreen) {
+                        document.documentElement.webkitRequestFullscreen();
+                    }
+                } else {
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen().catch(() => {});
+                    } else if (document.webkitExitFullscreen) {
+                        document.webkitExitFullscreen();
+                    }
+                }
+            } catch (err) {
+                console.warn('Fullscreen not supported:', err);
+            }
         });
         
         document.getElementById('new-capture-btn').addEventListener('click', resetToCapture);
@@ -958,6 +979,9 @@ const UIManager = {
         // Fallback Mouse & Touch for Drag & Drop
         const startDrag = (e) => {
             if(State.mode !== 'PLAYING') return;
+            if (e.cancelable && e.type.startsWith('touch')) {
+                e.preventDefault();
+            }
             const r = Els.canvas.getBoundingClientRect();
             let clientX = e.clientX, clientY = e.clientY;
             if(e.touches && e.touches.length > 0) { clientX = e.touches[0].clientX; clientY = e.touches[0].clientY; }
@@ -968,6 +992,9 @@ const UIManager = {
         };
         const moveDrag = (e) => {
             if(!State.mouseFallback) return;
+            if (e.cancelable && e.type.startsWith('touch')) {
+                e.preventDefault();
+            }
             const r = Els.canvas.getBoundingClientRect();
             let clientX = e.clientX, clientY = e.clientY;
             if(e.touches && e.touches.length > 0) { clientX = e.touches[0].clientX; clientY = e.touches[0].clientY; }
@@ -983,9 +1010,23 @@ const UIManager = {
         Els.canvas.addEventListener('mousemove', moveDrag);
         window.addEventListener('mouseup', endDrag);
         
-        Els.canvas.addEventListener('touchstart', startDrag, {passive: true});
-        Els.canvas.addEventListener('touchmove', moveDrag, {passive: true});
-        window.addEventListener('touchend', endDrag);
+        Els.canvas.addEventListener('touchstart', startDrag, {passive: false});
+        Els.canvas.addEventListener('touchmove', moveDrag, {passive: false});
+        window.addEventListener('touchend', endDrag, {passive: true});
+        window.addEventListener('touchcancel', endDrag, {passive: true});
+
+        // Resize / Orientation Adaptation
+        let resizeDebounce = null;
+        const onViewportChange = () => {
+            if (resizeDebounce) clearTimeout(resizeDebounce);
+            resizeDebounce = setTimeout(() => {
+                if ((State.mode === 'PLAYING' || State.mode === 'SOLVED') && State.capturedImageCanvas) {
+                    PuzzleEngine.cacheTileImages();
+                }
+            }, 100);
+        };
+        window.addEventListener('resize', onViewportChange);
+        window.addEventListener('orientationchange', onViewportChange);
         
         document.addEventListener('keydown', e => {
             if(e.key === 'z' || e.key === 'Z') { PuzzleEngine.undo(); return; }
