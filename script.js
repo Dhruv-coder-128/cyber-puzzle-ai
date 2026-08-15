@@ -281,6 +281,80 @@ const VisionManager = {
     hands: null,
     videoLoopId: null,
     isInitializing: false,
+    updateStandbyUI(state, error) {
+        const overlay = document.getElementById('camera-standby-overlay');
+        const title = document.getElementById('camera-standby-title');
+        const desc = document.getElementById('camera-standby-desc');
+        const btnText = document.getElementById('enable-camera-btn-text');
+        const metaText = document.getElementById('camera-meta-text');
+        const statusText = document.getElementById('camera-status-text');
+        const statusDot = document.getElementById('camera-status-dot');
+        const btn = document.getElementById('enable-camera-btn');
+
+        if (!overlay) return;
+
+        overlay.classList.remove('state-error', 'state-loading');
+
+        if (state === 'active') {
+            overlay.classList.add('hidden');
+            if (statusText) statusText.innerText = 'HAND TRACKING ACTIVE';
+            if (statusDot) {
+                statusDot.classList.remove('standby-dot');
+                statusDot.style.background = 'var(--accent)';
+            }
+        } else if (state === 'requesting') {
+            overlay.classList.remove('hidden');
+            overlay.classList.add('state-loading');
+            if (title) title.innerText = 'REQUESTING ACCESS...';
+            if (desc) desc.innerText = 'Please allow camera permission in your browser prompt.';
+            if (btnText) btnText.innerText = 'Connecting...';
+            if (btn) btn.disabled = true;
+            if (metaText) metaText.innerText = 'INITIALIZING SENSOR...';
+            if (statusText) statusText.innerText = 'REQUESTING ACCESS';
+            if (statusDot) {
+                statusDot.classList.add('standby-dot');
+                statusDot.style.background = 'var(--amber)';
+            }
+        } else if (state === 'denied') {
+            overlay.classList.remove('hidden');
+            overlay.classList.add('state-error');
+            if (title) title.innerText = 'CAMERA ACCESS BLOCKED';
+            if (desc) desc.innerText = 'Camera permission is required for gesture controls. Please check your browser address bar permissions.';
+            if (btnText) btnText.innerText = 'Try Again';
+            if (btn) btn.disabled = false;
+            if (metaText) metaText.innerText = 'PERMISSION DENIED';
+            if (statusText) statusText.innerText = 'ACCESS BLOCKED';
+            if (statusDot) {
+                statusDot.classList.add('standby-dot');
+                statusDot.style.background = 'var(--error)';
+            }
+        } else if (state === 'error') {
+            overlay.classList.remove('hidden');
+            overlay.classList.add('state-error');
+            if (title) title.innerText = 'CAMERA UNAVAILABLE';
+            if (desc) desc.innerText = error && error.message ? error.message : 'Unable to access camera on this device.';
+            if (btnText) btnText.innerText = 'Retry Camera';
+            if (btn) btn.disabled = false;
+            if (metaText) metaText.innerText = 'DEVICE OFFLINE';
+            if (statusText) statusText.innerText = 'CAMERA ERROR';
+            if (statusDot) {
+                statusDot.classList.add('standby-dot');
+                statusDot.style.background = 'var(--error)';
+            }
+        } else {
+            overlay.classList.remove('hidden');
+            if (title) title.innerText = 'CAMERA READY';
+            if (desc) desc.innerText = 'Enable your camera to unlock gesture controls';
+            if (btnText) btnText.innerText = 'Enable Camera';
+            if (btn) btn.disabled = false;
+            if (metaText) metaText.innerText = 'CAMERA OFF • HAND TRACKING STANDBY';
+            if (statusText) statusText.innerText = 'CAMERA STANDBY';
+            if (statusDot) {
+                statusDot.classList.add('standby-dot');
+                statusDot.style.background = 'var(--text-tertiary)';
+            }
+        }
+    },
     async init() {
         console.log('[Camera] permission check / init');
         if (this.isInitializing) return;
@@ -302,6 +376,7 @@ const VisionManager = {
     async startCamera() {
         console.log('[Camera] requesting camera stream');
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            this.updateStandbyUI('error', { message: 'Camera API not supported by this browser.' });
             UIManager.hide('loading-indicator');
             UIManager.show('error-screen');
             const errMsg = document.getElementById('error-msg');
@@ -315,6 +390,7 @@ const VisionManager = {
             Els.video.srcObject = null;
         }
 
+        this.updateStandbyUI('requesting');
         UIManager.show('loading-indicator');
         UIManager.hide('error-screen');
 
@@ -368,6 +444,7 @@ const VisionManager = {
             if (this.videoLoopId) cancelAnimationFrame(this.videoLoopId);
             this.videoLoopId = requestAnimationFrame(processFrame);
             
+            this.updateStandbyUI('active');
             UIManager.show('capture-instruction');
             UIManager.hide('loading-indicator');
             UIManager.hide('error-screen');
@@ -380,11 +457,13 @@ const VisionManager = {
             QATester.assert(true, `Camera started (${State.cameraFacingMode})`);
         } catch(e) {
             console.error('[VisionManager] Camera permission / access error:', e);
+            const isDenied = (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError');
+            this.updateStandbyUI(isDenied ? 'denied' : 'error', e);
             UIManager.hide('loading-indicator');
             UIManager.show('error-screen');
             const errMsg = document.getElementById('error-msg');
             if (errMsg) {
-                if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+                if (isDenied) {
                     errMsg.innerText = "Camera permission was denied. Please allow camera access in your browser settings to use live camera capture, or enjoy predefined puzzles from the Gallery.";
                 } else if (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError') {
                     errMsg.innerText = "No camera found on your device. You can still play all 20 puzzles in the Gallery!";
@@ -1569,6 +1648,11 @@ const UIManager = {
         const startTutorialBtn = document.getElementById('start-tutorial-btn');
         if (startTutorialBtn) {
             startTutorialBtn.addEventListener('click', startCameraTutorial);
+        }
+
+        const enableCameraBtn = document.getElementById('enable-camera-btn');
+        if (enableCameraBtn) {
+            enableCameraBtn.addEventListener('click', startCameraTutorial);
         }
 
         const welcomeGalleryBtn = document.getElementById('welcome-gallery-btn');

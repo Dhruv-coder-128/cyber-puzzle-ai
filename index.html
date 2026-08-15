@@ -317,13 +317,13 @@
             <div class="camera-panel">
                 <div class="camera-panel-header">
                     <span class="panel-label">LIVE CAMERA</span>
-                    <span class="camera-status">
-                        <span class="status-dot" aria-hidden="true"></span>
-                        HAND TRACKING ACTIVE
+                    <span class="camera-status" id="camera-status-indicator">
+                        <span class="status-dot standby-dot" id="camera-status-dot" aria-hidden="true"></span>
+                        <span id="camera-status-text">CAMERA STANDBY</span>
                     </span>
                 </div>
 
-                <!-- Camera viewport — contains the live video feed + capture overlay -->
+                <!-- Camera viewport — contains the live video feed + capture overlay + standby state -->
                 <div class="camera-viewport" aria-label="Camera feed with hand tracking overlay">
                     <!-- video element here so MediaPipe input and visual display are the same element -->
                     <video id="input-video" class="camera-video" playsinline autoplay muted></video>
@@ -340,6 +340,44 @@
                             </div>
                             <p class="capture-title">PINCH TO CAPTURE</p>
                             <p class="capture-desc">Bring thumb + index together</p>
+                        </div>
+                    </div>
+
+                    <!-- Camera Standby / Empty State Placeholder -->
+                    <div id="camera-standby-overlay" class="camera-standby-overlay">
+                        <div class="camera-standby-grid" aria-hidden="true"></div>
+                        <div class="camera-standby-brackets" aria-hidden="true">
+                            <span class="cs-bracket tl"></span>
+                            <span class="cs-bracket tr"></span>
+                            <span class="cs-bracket bl"></span>
+                            <span class="cs-bracket br"></span>
+                        </div>
+
+                        <div class="camera-standby-content">
+                            <!-- Minimal camera icon with soft radial glow -->
+                            <div class="camera-standby-icon-wrap" id="camera-standby-icon-wrap">
+                                <div class="camera-standby-glow" aria-hidden="true"></div>
+                                <svg class="camera-standby-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+                            </div>
+
+                            <!-- Main Status & Subtitle -->
+                            <h4 id="camera-standby-title" class="camera-standby-title">CAMERA READY</h4>
+                            <p id="camera-standby-desc" class="camera-standby-desc">Enable your camera to unlock gesture controls</p>
+
+                            <!-- CTA Button: triggers existing camera permission flow -->
+                            <button id="enable-camera-btn" class="btn btn-camera-standby">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+                                <span id="enable-camera-btn-text">Enable Camera</span>
+                            </button>
+
+                            <!-- Mini Hardware Status Tag -->
+                            <div class="camera-standby-meta">
+                                <span class="camera-meta-dot" id="camera-meta-dot" aria-hidden="true"></span>
+                                <span id="camera-meta-text">CAMERA OFF • STANDBY</span>
+                            </div>
+
+                            <!-- Privacy note -->
+                            <p class="camera-standby-privacy">Your camera is used only for the puzzle experience.</p>
                         </div>
                     </div>
                 </div>
