@@ -967,6 +967,238 @@ canvas#output-canvas.visible {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   READY / PREVIEW OVERLAY
+   ═══════════════════════════════════════════════════════════ */
+.ready-card-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    max-width: 320px;
+    animation: fadeUp 0.35s var(--ease-out) forwards;
+}
+
+.ready-badge {
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: var(--accent);
+    text-transform: uppercase;
+    background: var(--accent-dim);
+    border: 1px solid var(--accent-border);
+    padding: 3px 12px;
+    border-radius: 12px;
+}
+
+.ready-image-frame {
+    width: min(180px, 45vw);
+    aspect-ratio: 1;
+    border-radius: var(--r-md);
+    overflow: hidden;
+    border: 1px solid var(--border-strong);
+    box-shadow: var(--shadow-lg);
+    background: #0B0D0E;
+    position: relative;
+}
+
+#ready-canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.ready-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ready-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.ready-grid-badge {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--amber);
+    background: var(--amber-dim);
+    border: 1px solid var(--amber-border);
+    padding: 2px 8px;
+    border-radius: 6px;
+    letter-spacing: 0.05em;
+}
+
+.btn-start {
+    height: 38px;
+    padding: 0 20px;
+    font-size: 13.5px;
+    font-weight: 700;
+    gap: 8px;
+    width: 100%;
+    margin-top: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   GALLERY MODAL & GRID
+   ═══════════════════════════════════════════════════════════ */
+.gallery-card {
+    background: var(--surface-1);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-xl);
+    width: min(880px, 94vw);
+    max-height: min(85vh, 760px);
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-xl);
+    animation: fadeUp 0.3s var(--ease-out) forwards;
+    overflow: hidden;
+}
+
+.gallery-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--surface-2);
+}
+
+.gallery-header-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    text-align: left;
+}
+
+.gallery-title {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--text-primary);
+    text-transform: uppercase;
+}
+
+.gallery-subtitle {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    padding: 18px;
+    overflow-y: auto;
+    max-height: calc(85vh - 75px);
+    -webkit-overflow-scrolling: touch;
+}
+
+.gallery-grid::-webkit-scrollbar {
+    width: 5px;
+}
+
+.gallery-grid::-webkit-scrollbar-track {
+    background: var(--surface-1);
+}
+
+.gallery-grid::-webkit-scrollbar-thumb {
+    background: var(--surface-3);
+    border-radius: 4px;
+}
+
+.gallery-item {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    overflow: hidden;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.15s var(--ease-out), border-color 0.15s var(--ease-out), box-shadow 0.15s var(--ease-out);
+    position: relative;
+}
+
+.gallery-item:hover {
+    transform: translateY(-2px);
+    border-color: rgba(99, 230, 190, 0.4);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+
+.gallery-item.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 14px rgba(99, 230, 190, 0.25);
+}
+
+.gallery-thumb-wrap {
+    width: 100%;
+    aspect-ratio: 1;
+    overflow: hidden;
+    background: #0B0D0E;
+}
+
+.gallery-thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.25s var(--ease-out);
+}
+
+.gallery-item:hover .gallery-thumb {
+    transform: scale(1.04);
+}
+
+.gallery-item-label {
+    padding: 7px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-primary);
+    text-align: center;
+    background: var(--surface-2);
+    border-top: 1px solid var(--border);
+    white-space: nowrap;
+    letter-spacing: 0.04em;
+}
+
+.gallery-item.active .gallery-item-label {
+    color: var(--accent);
+}
+
+@media (max-width: 860px) {
+    .gallery-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        padding: 14px;
+    }
+}
+
+@media (max-width: 500px) {
+    .gallery-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+        padding: 10px;
+    }
+    .gallery-card {
+        width: 96vw;
+        max-height: 88vh;
+    }
+    .gallery-header {
+        padding: 12px 14px;
+    }
+    .gallery-title {
+        font-size: 12.5px;
+    }
+    .gallery-subtitle {
+        font-size: 11px;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════
    SETTINGS MODAL & TOGGLE SWITCHES
    ═══════════════════════════════════════════════════════════ */
 .settings-card {

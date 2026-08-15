@@ -35,7 +35,7 @@
                     <rect x="3" y="14" width="7" height="7" rx="2" stroke="#F3F5F4" stroke-width="1.8"/>
                     <rect x="14" y="14" width="7" height="7" rx="2" fill="#63E6BE"/>
                 </svg>
-                <span class="logo-text">CYBER_PUZZLE<span class="logo-accent">.AI</span></span>
+                <span class="logo-text">CYBER_PUZZLE</span>
             </div>
 
             <!-- HUD Stats — center -->
@@ -81,6 +81,10 @@
 
                     <button id="cam-btn" class="btn btn-icon" title="Switch Camera" aria-label="Switch Camera">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7h-3a2 2 0 0 1-2-2V3"/><path d="M9 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/><path d="m14 3 6 4-6 4V3z"/><path d="m10 17-6-4 6-4v8z"/></svg>
+                    </button>
+
+                    <button id="gallery-btn" class="btn btn-icon" title="Puzzle Gallery" aria-label="Puzzle Gallery">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
                     </button>
 
                     <button id="fullscreen-btn" class="btn btn-icon" title="Fullscreen" aria-label="Fullscreen">
@@ -189,6 +193,24 @@
                 <button id="retry-cam-btn" class="btn btn-secondary margin-top">Retry Connection</button>
             </div>
 
+            <!-- Ready / Preview overlay before puzzle starts -->
+            <div id="ready-overlay" class="overlay-card hidden">
+                <div class="ready-card-inner">
+                    <span class="ready-badge">SELECTED PUZZLE</span>
+                    <div class="ready-image-frame">
+                        <canvas id="ready-canvas"></canvas>
+                    </div>
+                    <div class="ready-info">
+                        <span id="ready-title" class="ready-title">Puzzle 01</span>
+                        <span id="ready-grid-badge" class="ready-grid-badge">3 × 3</span>
+                    </div>
+                    <button id="start-puzzle-btn" class="btn btn-primary btn-start">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                        <span>START PUZZLE</span>
+                    </button>
+                </div>
+            </div>
+
             <!-- Win modal -->
             <div id="win-modal" class="modal-overlay hidden">
                 <div class="success-card">
@@ -213,6 +235,7 @@
                     </div>
                     <div class="modal-actions">
                         <button id="play-again-btn" class="btn btn-primary">Play Again</button>
+                        <button id="win-gallery-btn" class="btn btn-secondary">Gallery</button>
                         <button id="win-new-capture-btn" class="btn btn-secondary">New Capture</button>
                     </div>
                     <div class="modal-actions" style="margin-top: 8px;">
@@ -228,8 +251,6 @@
                 </div>
             </div>
 
-            
-
         </div><!-- /puzzle-panel -->
 
         <!-- RIGHT: Camera + controls sidebar -->
@@ -244,7 +265,6 @@
                         HAND TRACKING ACTIVE
                     </span>
                 </div>
-
 
                 <!-- Camera viewport — contains the live video feed + capture overlay -->
                 <div class="camera-viewport" aria-label="Camera feed with hand tracking overlay">
@@ -271,7 +291,7 @@
             <!-- Mini preview (captured image) -->
             <div id="mini-preview" class="preview-panel hidden">
                 <div class="panel-label-row">
-                    <span class="panel-label">CAPTURED IMAGE</span>
+                    <span class="panel-label">ACTIVE PUZZLE IMAGE</span>
                 </div>
                 <canvas id="preview-canvas"></canvas>
             </div>
@@ -279,6 +299,26 @@
         </aside>
 
     </main>
+
+    <!-- ═══════════════════════════════════════════════
+         GALLERY MODAL
+    ════════════════════════════════════════════════ -->
+    <div id="gallery-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="gallery-title">
+        <div class="gallery-card">
+            <div class="gallery-header">
+                <div class="gallery-header-info">
+                    <h3 id="gallery-title" class="gallery-title">PUZZLE GALLERY</h3>
+                    <span class="gallery-subtitle">Choose an image to play</span>
+                </div>
+                <button id="gallery-close-btn" class="btn btn-ghost btn-icon" aria-label="Close Gallery">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="gallery-grid" id="gallery-grid">
+                <!-- Dynamically populated 20 puzzle cards -->
+            </div>
+        </div>
+    </div>
 
     <!-- Fallback drag hint (bottom center, unchanged positioning) -->
 

