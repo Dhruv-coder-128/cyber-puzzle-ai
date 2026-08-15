@@ -757,363 +757,32 @@ canvas#output-canvas {
 
 .margin-top {
     margin-top: 8px;
-/* ═══════════════════════════════════════════════════════════
-   COMMAND CENTER (HOME / IDLE SCREEN REDESIGN)
-   ═══════════════════════════════════════════════════════════ */
-.command-center-overlay {
-    position: absolute;
-    inset: 0;
-    z-index: 60;
+}
+
+/* ─── Tutorial list ──────────────────────────────────────── */
+.tutorial-list {
+    list-style: none;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
-    padding: clamp(16px, 3vh, 32px) clamp(18px, 3vw, 36px);
-    background: radial-gradient(circle at 50% 35%, rgba(20, 26, 29, 0.96) 0%, rgba(13, 16, 18, 0.98) 100%);
-    backdrop-filter: blur(28px);
-    -webkit-backdrop-filter: blur(28px);
-    overflow-y: auto;
-    overflow-x: hidden;
-    box-sizing: border-box;
-}
-
-.command-center-overlay.hidden {
-    display: none !important;
-}
-
-/* Background Cyber Grid */
-.cmd-backdrop-grid {
-    position: absolute;
-    inset: 0;
-    background-image: 
-        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-    background-size: 32px 32px;
-    pointer-events: none;
-    opacity: 0.6;
-}
-
-/* Corner Technical Brackets */
-.cmd-corner-brackets {
-    position: absolute;
-    inset: 12px;
-    pointer-events: none;
-}
-
-.cmd-bracket {
-    position: absolute;
-    width: 14px;
-    height: 14px;
-    border-color: rgba(99, 230, 190, 0.35);
-}
-
-.cmd-bracket.tl { top: 0; left: 0; border-top: 1.5px solid; border-left: 1.5px solid; }
-.cmd-bracket.tr { top: 0; right: 0; border-top: 1.5px solid; border-right: 1.5px solid; }
-.cmd-bracket.bl { bottom: 0; left: 0; border-bottom: 1.5px solid; border-left: 1.5px solid; }
-.cmd-bracket.br { bottom: 0; right: 0; border-bottom: 1.5px solid; border-right: 1.5px solid; }
-
-/* Top Telemetry Header */
-.cmd-telemetry-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    position: relative;
-    z-index: 2;
-    padding-bottom: 12px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    flex-shrink: 0;
-}
-
-.cmd-status-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    padding: 4px 10px;
-    border-radius: var(--r-full);
-    background: rgba(99, 230, 190, 0.06);
-    border: 1px solid rgba(99, 230, 190, 0.22);
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    color: var(--accent);
-}
-
-.cmd-pulse-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--accent);
-    box-shadow: 0 0 8px rgba(99, 230, 190, 0.8);
-    animation: pulse-dot 2s var(--ease-in-out) infinite;
-}
-
-.cmd-hud-tags {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.cmd-hud-tag {
-    font-size: 9px;
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    color: var(--text-tertiary);
-    background: rgba(255, 255, 255, 0.03);
-    padding: 3px 8px;
-    border-radius: 4px;
-    border: 1px solid rgba(255, 255, 255, 0.04);
-}
-
-/* Main Panoramic Command Center Body */
-.cmd-center-body {
-    display: grid;
-    grid-template-columns: 1.15fr 0.85fr 1fr;
-    gap: clamp(16px, 2.5vw, 36px);
-    align-items: center;
-    position: relative;
-    z-index: 2;
-    flex: 1;
-    margin: clamp(10px, 2vh, 20px) 0;
-}
-
-/* LEFT: Info & Capabilities Column */
-.cmd-info-column {
-    display: flex;
-    flex-direction: column;
+    gap: 10px;
     text-align: left;
-    gap: 6px;
+    width: 100%;
+    max-width: 300px;
 }
 
-.cmd-badge-lead {
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.16em;
-    color: var(--accent);
-    text-transform: uppercase;
-}
-
-.cmd-hero-title {
-    font-size: clamp(26px, 3.2vw, 40px);
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    color: var(--text-primary);
-    line-height: 1.1;
-    margin: 0;
-}
-
-.cmd-title-accent {
-    color: var(--accent);
-}
-
-.cmd-hero-desc {
+.tutorial-list li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     font-size: 13px;
     color: var(--text-secondary);
-    line-height: 1.5;
-    margin: 4px 0 14px;
-    max-width: 380px;
+    line-height: 1.4;
 }
 
-/* Capability Chips Grid */
-.cmd-capabilities-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-    margin-bottom: 12px;
-}
-
-.cmd-cap-chip {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    padding: 8px 10px;
-    background: rgba(22, 27, 30, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: var(--r-md);
-    transition: all 0.2s ease;
-}
-
-.cmd-cap-chip:hover {
-    border-color: rgba(99, 230, 190, 0.25);
-    background: rgba(26, 32, 36, 0.8);
-}
-
-.cmd-cap-icon {
+.tut-icon {
     width: 26px;
     height: 26px;
     border-radius: var(--r-sm);
-    background: rgba(99, 230, 190, 0.08);
-    border: 1px solid rgba(99, 230, 190, 0.18);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--accent);
-    flex-shrink: 0;
-}
-
-.cmd-cap-text {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-}
-
-.cmd-cap-text strong {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--text-primary);
-    line-height: 1.2;
-}
-
-.cmd-cap-text span {
-    font-size: 9.5px;
-    color: var(--text-tertiary);
-    line-height: 1.2;
-}
-
-/* HUD Telemetry Strip */
-.cmd-hud-strip {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 9px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    color: var(--text-tertiary);
-    font-family: var(--font-mono, monospace);
-    padding-top: 4px;
-}
-
-.hud-sep {
-    opacity: 0.3;
-}
-
-/* CENTER: Decorative 3x3 Puzzle Silhouette */
-.cmd-puzzle-visual-column {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-}
-
-.cmd-puzzle-grid-silhouette {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    width: clamp(160px, 18vw, 210px);
-    aspect-ratio: 1;
-    position: relative;
-    z-index: 1;
-}
-
-.cmd-grid-cell {
-    background: rgba(22, 28, 31, 0.65);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    transition: all 0.3s var(--ease-out);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-.cell-num {
-    font-size: 9px;
-    font-weight: 700;
-    color: rgba(255, 255, 255, 0.14);
-    letter-spacing: 0.05em;
-    font-family: var(--font-mono, monospace);
-}
-
-.cmd-grid-cell.c-center {
-    background: rgba(26, 34, 38, 0.85);
-    border-color: rgba(99, 230, 190, 0.45);
-    box-shadow: 0 0 20px rgba(99, 230, 190, 0.15), 0 4px 16px rgba(0,0,0,0.5);
-    animation: float-center 3s var(--ease-in-out) infinite;
-}
-
-.center-aperture {
-    color: var(--accent);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    z-index: 2;
-}
-
-.c-pulse-ring {
-    position: absolute;
-    inset: -3px;
-    border-radius: 12px;
-    border: 1px dashed rgba(99, 230, 190, 0.4);
-    animation: spin 16s linear infinite;
-    pointer-events: none;
-}
-
-@keyframes float-center {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-3px); }
-}
-
-/* RIGHT: Action Command Column */
-.cmd-actions-column {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    width: 100%;
-}
-
-.cmd-action-card {
-    background: rgba(21, 26, 29, 0.75);
-    border: 1px solid var(--border);
-    border-radius: var(--r-lg);
-    padding: 14px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    text-align: left;
-    position: relative;
-    box-shadow: var(--shadow-sm);
-    transition: all 0.25s var(--ease-out);
-}
-
-.cmd-action-card:hover {
-    border-color: var(--border-strong);
-    background: rgba(25, 31, 35, 0.9);
-}
-
-.primary-action-card {
-    border-color: rgba(99, 230, 190, 0.28);
-    background: linear-gradient(135deg, rgba(23, 31, 34, 0.85) 0%, rgba(18, 23, 26, 0.85) 100%);
-}
-
-.primary-action-card:hover {
-    border-color: rgba(99, 230, 190, 0.55);
-    box-shadow: 0 0 24px rgba(99, 230, 190, 0.12), var(--shadow-md);
-}
-
-.cmd-card-badge {
-    position: absolute;
-    top: 10px;
-    right: 12px;
-    font-size: 8.5px;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    color: var(--accent);
-    background: rgba(99, 230, 190, 0.08);
-    padding: 2px 6px;
-    border-radius: 4px;
-    border: 1px solid rgba(99, 230, 190, 0.2);
-}
-
-.cmd-card-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.cmd-card-icon {
-    width: 34px;
-    height: 34px;
-    border-radius: var(--r-md);
     background: var(--surface-3);
     border: 1px solid var(--border);
     display: flex;
@@ -1123,119 +792,55 @@ canvas#output-canvas {
     flex-shrink: 0;
 }
 
-.camera-glow-icon {
-    background: rgba(99, 230, 190, 0.1);
-    border-color: rgba(99, 230, 190, 0.3);
-    box-shadow: 0 0 12px rgba(99, 230, 190, 0.2);
-}
-
-.cmd-card-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin: 0;
-    line-height: 1.2;
-}
-
-.cmd-card-sub {
-    font-size: 10.5px;
-    color: var(--text-secondary);
-    margin: 2px 0 0;
-    line-height: 1.2;
-}
-
-.cmd-gallery-preview-strip {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 6px;
+/* Privacy & Photo Sharing Notice Box */
+.privacy-notice-box {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    width: 100%;
+    max-width: 320px;
+    background: rgba(99, 230, 190, 0.04);
+    border: 1px solid rgba(99, 230, 190, 0.18);
+    border-radius: var(--r-md);
+    padding: 10px 12px;
+    text-align: left;
     margin: 2px 0;
 }
 
-.mini-thumb {
-    width: 100%;
-    aspect-ratio: 1;
-    object-fit: cover;
-    border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    opacity: 0.85;
-    transition: opacity 0.2s ease, transform 0.2s ease;
-}
-
-.cmd-action-card:hover .mini-thumb {
-    opacity: 1;
-}
-
-.btn-cmd-primary {
-    width: 100%;
-    padding: 10px 14px;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
+.privacy-notice-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    box-shadow: 0 0 16px rgba(99, 230, 190, 0.25);
+    color: var(--accent);
+    flex-shrink: 0;
+    margin-top: 1px;
 }
 
-.cmd-btn-arrow {
-    transition: transform 0.2s ease;
+.privacy-notice-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
 }
 
-.btn-cmd-primary:hover .cmd-btn-arrow {
-    transform: translateX(3px);
-}
-
-.btn-cmd-secondary {
-    width: 100%;
-    padding: 9px 12px;
+.notice-main {
     font-size: 11.5px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: 1.35;
+}
+
+.notice-sub {
+    font-size: 10.5px;
+    color: var(--text-secondary);
+    line-height: 1.35;
+}
+
+.overlay-actions {
     display: flex;
-    align-items: center;
-    justify-content: center;
     gap: 8px;
-}
-
-/* ═══════════════════════════════════════════════════════════
-   RESPONSIVE ADAPTATION FOR COMMAND CENTER
-   ═══════════════════════════════════════════════════════════ */
-@media (max-width: 960px) {
-    .cmd-center-body {
-        grid-template-columns: 1fr 1fr;
-    }
-    .cmd-puzzle-visual-column {
-        display: none;
-    }
-}
-
-@media (max-width: 640px) {
-    .command-center-overlay {
-        padding: 14px;
-        justify-content: flex-start;
-        gap: 12px;
-    }
-    .cmd-center-body {
-        grid-template-columns: 1fr;
-        gap: 14px;
-        margin: 6px 0;
-    }
-    .cmd-info-column {
-        text-align: center;
-        align-items: center;
-    }
-    .cmd-hero-desc {
-        max-width: 100%;
-        margin-bottom: 10px;
-    }
-    .cmd-capabilities-grid {
-        width: 100%;
-        gap: 6px;
-    }
-    .cmd-hud-strip {
-        justify-content: center;
-    }
+    width: 100%;
+    max-width: 300px;
+    margin-top: 4px;
 }
 
 /* ─── Spinner ────────────────────────────────────────────── */
