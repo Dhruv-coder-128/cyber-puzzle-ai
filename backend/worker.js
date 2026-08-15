@@ -1,69 +1,146 @@
 /**
  * Cloudflare Worker for CYBER_PUZZLE.AI Telegram Photo Delivery
  * 
- * Secure serverless endpoint that receives captured photos from the frontend
- * and forwards them to Telegram Bot API using server-side secrets.
+ * Exposes:
+ * - OPTIONS /upload, OPTIONS /  -> CORS preflight (204)
+ * - POST /upload, POST /        -> Receives photo and forwards to Telegram sendPhoto (200)
+ * - GET /upload, GET /          -> Health check (200)
  * 
- * Environment Secrets (NEVER exposed to frontend):
+ * Required Cloudflare Secrets:
  * - TELEGRAM_BOT_TOKEN
  * - TELEGRAM_CHAT_ID
  */
 
+// Helper to construct dynamic CORS headers for both GitHub Pages and local development
+function getCorsHeaders(request) {
+    const origin = request.headers.get('Origin') || '';
+    
+    // Default allowed origin is production GitHub Pages
+    let allowOrigin = 'https://dhruv-coder-128.github.io';
+    
+    if (!origin || origin === 'null') {
+        // Local file:/// execution or curl without Origin header
+        allowOrigin = '*';
+    } else if (
+        origin === 'https://dhruv-coder-128.github.io' ||
+        origin.endsWith('.github.io') ||
+        origin.startsWith('http://localhost') ||
+        origin.startsWith('http://127.0.0.1')
+    ) {
+        allowOrigin = origin;
+    } else {
+        // Echo origin for compatibility
+        allowOrigin = origin;
+    }
+
+    return {
+        'Access-Control-Allow-Origin': allowOrigin,
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+        'Access-Control-Max-Age': '86400',
+    };
+}
+
+// Helper to create JSON responses with required CORS headers
+function jsonResponse(data, status = 200, request = null) {
+    const corsHeaders = request ? getCorsHeaders(request) : {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+    };
+
+    return new Response(JSON.stringify(data, null, 2), {
+        status,
+        headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders,
+        },
+    });
+}
+
 export default {
     async fetch(request, env, ctx) {
-        // Handle CORS preflight
+        const url = new URL(request.url);
+        const path = url.pathname.replace(/\/+$/, '') || '/'; // normalize trailing slashes
+        const corsHeaders = getCorsHeaders(request);
+
+        // 1. Handle CORS Preflight (OPTIONS) for all endpoints
         if (request.method === 'OPTIONS') {
             return new Response(null, {
                 status: 204,
-                headers: {
-                    'Access-Control-Allow-Origin': '*',
-                    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-                    'Access-Control-Allow-Headers': 'Content-Type',
-                    'Access-Control-Max-Age': '86400',
-                },
+                headers: corsHeaders,
             });
         }
 
-        // Only allow POST requests
+        // 2. Health check (GET / or GET /upload)
+        if (request.method === 'GET') {
+            return jsonResponse({
+                status: 'online',
+                service: 'CYBER_PUZZLE.AI Telegram Delivery Worker',
+                endpoints: {
+                    upload: 'POST /upload',
+                    health: 'GET /'
+                },
+                corsAllowedOrigin: corsHeaders['Access-Control-Allow-Origin']
+            }, 200, request);
+        }
+
+        // 3. Only allow POST for photo delivery
         if (request.method !== 'POST') {
-            return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-                status: 405,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*',
-                },
-            });
+            return jsonResponse({ error: 'Method not allowed. Use POST /upload' }, 405, request);
         }
 
-        // Check if secrets are configured
+        // 4. Validate route (support both /upload and root /)
+        if (path !== '/upload' && path !== '/') {
+            return jsonResponse({ error: `Route ${path} not found. Expected POST /upload` }, 404, request);
+        }
+
+        // 5. Verify server-side Cloudflare environment secrets
         if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) {
-            console.error('Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID in environment secrets');
-            return new Response(JSON.stringify({ error: 'Server configuration error: missing Telegram secrets' }), {
-                status: 500,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*',
-                },
-            });
+            console.error('Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID in Cloudflare secrets');
+            return jsonResponse({
+                error: 'Server configuration error',
+                message: 'TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not configured in Cloudflare Worker secrets.'
+            }, 500, request);
         }
 
+        // 6. Parse incoming request and extract image
         try {
-            const formData = await request.formData();
-            const photo = formData.get('photo');
-            const timestamp = formData.get('timestamp') || new Date().toISOString();
-            const gridSize = formData.get('gridSize') || '3x3';
+            const contentType = request.headers.get('content-type') || '';
+            let photo = null;
+            let timestamp = new Date().toISOString();
+            let gridSize = '3x3';
 
-            if (!photo) {
-                return new Response(JSON.stringify({ error: 'No photo provided in request' }), {
-                    status: 400,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Access-Control-Allow-Origin': '*',
-                    },
-                });
+            if (contentType.includes('multipart/form-data')) {
+                const formData = await request.formData();
+                photo = formData.get('photo') || formData.get('image') || formData.get('file');
+                timestamp = formData.get('timestamp') || timestamp;
+                gridSize = formData.get('gridSize') || gridSize;
+            } else if (contentType.includes('application/json')) {
+                const body = await request.json();
+                if (body.image || body.photo) {
+                    const rawBase64 = (body.image || body.photo).replace(/^data:image\/\w+;base64,/, '');
+                    const binary = Uint8Array.from(atob(rawBase64), c => c.charCodeAt(0));
+                    photo = new Blob([binary], { type: 'image/jpeg' });
+                }
+                timestamp = body.timestamp || timestamp;
+                gridSize = body.gridSize || gridSize;
+            } else {
+                // Raw binary upload fallback
+                const buffer = await request.arrayBuffer();
+                if (buffer && buffer.byteLength > 0) {
+                    photo = new Blob([buffer], { type: 'image/jpeg' });
+                }
             }
 
-            // Format timestamp for display caption
+            if (!photo) {
+                return jsonResponse({
+                    error: 'Bad Request',
+                    message: 'No photo provided in request. Expected multipart/form-data with field "photo".'
+                }, 400, request);
+            }
+
+            // Format timestamp for display in Telegram caption
             let formattedTime = timestamp;
             try {
                 formattedTime = new Date(timestamp).toLocaleString('en-US', {
@@ -79,10 +156,10 @@ export default {
             // Build Telegram Bot API form data
             const tgFormData = new FormData();
             tgFormData.append('chat_id', env.TELEGRAM_CHAT_ID);
-            tgFormData.append('photo', photo);
+            tgFormData.append('photo', photo, 'captured_puzzle.jpg');
             tgFormData.append('caption', caption);
 
-            // Forward to Telegram Bot API sendPhoto endpoint
+            // 7. Dispatch to Telegram Bot API sendPhoto
             const tgUrl = `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendPhoto`;
             const tgResponse = await fetch(tgUrl, {
                 method: 'POST',
@@ -93,40 +170,24 @@ export default {
 
             if (!tgResponse.ok || !tgResult.ok) {
                 console.error('Telegram API error:', tgResult);
-                return new Response(JSON.stringify({
-                    error: 'Failed to deliver to Telegram',
+                return jsonResponse({
+                    error: 'Telegram Delivery Failed',
                     details: tgResult.description || 'Unknown Telegram API error'
-                }), {
-                    status: 502,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Access-Control-Allow-Origin': '*',
-                    },
-                });
+                }, 500, request);
             }
 
-            return new Response(JSON.stringify({
+            // 8. Return success
+            return jsonResponse({
                 success: true,
                 message: 'Photo delivered to Telegram successfully'
-            }), {
-                status: 200,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*',
-                },
-            });
+            }, 200, request);
+
         } catch (error) {
-            console.error('Worker processing error:', error);
-            return new Response(JSON.stringify({
-                error: 'Internal server error',
+            console.error('Worker error:', error);
+            return jsonResponse({
+                error: 'Internal Server Error',
                 message: error.message
-            }), {
-                status: 500,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*',
-                },
-            });
+            }, 500, request);
         }
     },
 };
