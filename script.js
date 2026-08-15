@@ -362,8 +362,6 @@ const VisionManager = {
         try {
             if (!this.hands) {
                 console.log('[Tracking] initializing MediaPipe Hands');
-                // locateFile: pinned to the same version as the <script> tag in index.html
-                // so WASM binaries and the JS wrapper always come from the exact same package.
                 this.hands = new Hands({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${f}` });
                 this.hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
                 this.hands.onResults(results => this.onResults(results));
@@ -374,7 +372,7 @@ const VisionManager = {
         }
     },
     async startCamera() {
-        console.log('[Camera] requesting camera stream');
+        console.log('[Camera] requesting camera stream, facingMode:', State.cameraFacingMode);
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             this.updateStandbyUI('error', { message: 'Camera API not supported by this browser.' });
             UIManager.hide('loading-indicator');
@@ -384,94 +382,166 @@ const VisionManager = {
             return;
         }
 
-        // Clean up any existing stream tracks first to avoid duplicate active streams
+        // 1. Clean up any existing stream tracks first to release camera hardware
         if (Els.video && Els.video.srcObject) {
-            Els.video.srcObject.getTracks().forEach(t => t.stop());
+            const oldStream = Els.video.srcObject;
+            try {
+                oldStream.getTracks().forEach(track => track.stop());
+            } catch(e) {}
             Els.video.srcObject = null;
+        }
+        if (this.videoLoopId) {
+            cancelAnimationFrame(this.videoLoopId);
+            this.videoLoopId = null;
         }
 
         this.updateStandbyUI('requesting');
         UIManager.show('loading-indicator');
         UIManager.hide('error-screen');
 
+        let stream = null;
+        const isRear = State.cameraFacingMode === 'environment';
+
+        // Strategy 1: Ideal facingMode with ideal high resolution (Works universally on iOS & Android)
+        const primaryConstraints = {
+            video: { 
+                facingMode: isRear ? { ideal: 'environment' } : { ideal: 'user' },
+                width: { ideal: 1280 }, 
+                height: { ideal: 720 } 
+            },
+            audio: false
+        };
+
         try {
-            const constraints = {
-                video: { 
-                    width: { ideal: 1280 }, 
-                    height: { ideal: 720 }, 
-                    facingMode: State.cameraFacingMode 
-                },
-                audio: false
-            };
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
-            Els.video.srcObject = stream;
-            console.log('[Camera] stream started');
-            
-            // Wait for metadata / readiness to ensure video dimensions are known
-            await new Promise((resolve) => {
-                if (Els.video.readyState >= 2 && Els.video.videoWidth > 0) {
-                    resolve();
-                } else {
-                    Els.video.onloadedmetadata = () => resolve();
-                }
-            });
-            
+            stream = await navigator.mediaDevices.getUserMedia(primaryConstraints);
+        } catch (err1) {
+            console.warn('[Camera] primary constraints failed, trying basic facingMode...', err1);
+            // Strategy 2: Basic string facingMode
             try {
-                await Els.video.play();
-            } catch (playErr) {
-                console.warn('[Camera] play error:', playErr);
-            }
-            console.log('[Camera] video ready', Els.video.videoWidth, 'x', Els.video.videoHeight);
-            
-            // Ensure canvas matches video dimensions
-            if (Els.video.videoWidth > 0 && Els.video.videoHeight > 0) {
-                Els.canvas.width = Els.video.videoWidth;
-                Els.canvas.height = Els.video.videoHeight;
-            }
-            
-            let lastVideoTime = -1;
-            const processFrame = async () => {
-                if (Els.video && Els.video.currentTime !== lastVideoTime && !Els.video.paused && !Els.video.ended) {
-                    lastVideoTime = Els.video.currentTime;
-                    if (this.hands) {
-                        await this.hands.send({image: Els.video});
+                const fallbackConstraints = {
+                    video: { 
+                        facingMode: isRear ? 'environment' : 'user' 
+                    },
+                    audio: false
+                };
+                stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+            } catch (err2) {
+                console.warn('[Camera] basic facingMode failed, checking device enumeration...', err2);
+                // Strategy 3: Enumerate devices
+                try {
+                    let chosenDeviceId = null;
+                    if (navigator.mediaDevices.enumerateDevices) {
+                        const devices = await navigator.mediaDevices.enumerateDevices();
+                        const videoDevices = devices.filter(d => d.kind === 'videoinput');
+                        if (videoDevices.length > 0) {
+                            const match = videoDevices.find(d => {
+                                const label = (d.label || '').toLowerCase();
+                                return isRear ? (label.includes('back') || label.includes('rear') || label.includes('environment'))
+                                              : (label.includes('front') || label.includes('user') || label.includes('facing'));
+                            });
+                            chosenDeviceId = match ? match.deviceId : videoDevices[0].deviceId;
+                        }
                     }
-                }
-                if (Els.video && Els.video.srcObject) {
-                    this.videoLoopId = requestAnimationFrame(processFrame);
-                }
-            };
-            if (this.videoLoopId) cancelAnimationFrame(this.videoLoopId);
-            this.videoLoopId = requestAnimationFrame(processFrame);
-            
-            this.updateStandbyUI('active');
-            UIManager.show('capture-instruction');
-            UIManager.hide('loading-indicator');
-            UIManager.hide('error-screen');
-            UIManager.hide('tutorial-overlay');
-            Els.video.classList.remove('hidden');
-            Els.canvas.classList.add('visible');
-            State.videoReady = true;
-            State.mode = 'CAPTURE';
-            console.log('[Tracking] active - ready for pinch capture');
-            QATester.assert(true, `Camera started (${State.cameraFacingMode})`);
-        } catch(e) {
-            console.error('[VisionManager] Camera permission / access error:', e);
-            const isDenied = (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError');
-            this.updateStandbyUI(isDenied ? 'denied' : 'error', e);
-            UIManager.hide('loading-indicator');
-            UIManager.show('error-screen');
-            const errMsg = document.getElementById('error-msg');
-            if (errMsg) {
-                if (isDenied) {
-                    errMsg.innerText = "Camera permission was denied. Please allow camera access in your browser settings to use live camera capture, or enjoy predefined puzzles from the Gallery.";
-                } else if (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError') {
-                    errMsg.innerText = "No camera found on your device. You can still play all 20 puzzles in the Gallery!";
-                } else {
-                    errMsg.innerText = `Camera access error: ${e.message || 'Unable to access camera.'} You can still play with the Predefined Gallery!`;
+                    if (chosenDeviceId) {
+                        stream = await navigator.mediaDevices.getUserMedia({
+                            video: { deviceId: { exact: chosenDeviceId } },
+                            audio: false
+                        });
+                    } else {
+                        // Strategy 4: Generic video
+                        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                    }
+                } catch (err3) {
+                    throw err3; // Escalate to main error handler
                 }
             }
-            QATester.assert(false, "Camera permission denied or camera error");
+        }
+
+        Els.video.srcObject = stream;
+        console.log('[Camera] stream started successfully');
+        
+        // Wait for metadata to ensure video dimensions are known
+        await new Promise((resolve) => {
+            if (Els.video.readyState >= 2 && Els.video.videoWidth > 0) {
+                resolve();
+            } else {
+                Els.video.onloadedmetadata = () => resolve();
+            }
+        });
+        
+        try {
+            await Els.video.play();
+        } catch (playErr) {
+            console.warn('[Camera] play error:', playErr);
+        }
+        console.log('[Camera] video ready:', Els.video.videoWidth, 'x', Els.video.videoHeight);
+        
+        // Match canvas dimensions to video feed
+        if (Els.video.videoWidth > 0 && Els.video.videoHeight > 0) {
+            Els.canvas.width = Els.video.videoWidth;
+            Els.canvas.height = Els.video.videoHeight;
+        }
+        
+        let lastVideoTime = -1;
+        const processFrame = async () => {
+            if (Els.video && Els.video.currentTime !== lastVideoTime && !Els.video.paused && !Els.video.ended) {
+                lastVideoTime = Els.video.currentTime;
+                // Only send frames to MediaPipe Hands if on front camera or playing
+                if (this.hands && (State.cameraFacingMode === 'user' || State.mode === 'PLAYING')) {
+                    await this.hands.send({image: Els.video});
+                }
+            }
+            if (Els.video && Els.video.srcObject) {
+                this.videoLoopId = requestAnimationFrame(processFrame);
+            }
+        };
+        this.videoLoopId = requestAnimationFrame(processFrame);
+        
+        this.updateStandbyUI('active');
+        this.updateCameraModeUI();
+        
+        UIManager.hide('loading-indicator');
+        UIManager.hide('error-screen');
+        UIManager.hide('tutorial-overlay');
+        Els.video.classList.remove('hidden');
+        Els.canvas.classList.add('visible');
+        State.videoReady = true;
+        State.mode = 'CAPTURE';
+        console.log('[Camera] active in mode CAPTURE, ready to capture snapshot');
+        QATester.assert(true, `Camera started (${State.cameraFacingMode})`);
+    },
+    updateCameraModeUI() {
+        const isRear = State.cameraFacingMode === 'environment';
+        
+        // 1. Mirroring
+        if (Els.video) {
+            Els.video.classList.toggle('is-mirrored', !isRear);
+        }
+
+        // 2. Camera status text & icons
+        const statusText = document.getElementById('camera-status-text');
+        const captureInstruction = document.getElementById('capture-instruction');
+        const manualCaptureBar = document.getElementById('manual-capture-bar');
+        const shutterLabel = document.getElementById('shutter-label-text');
+        const camBtn = document.getElementById('cam-btn');
+
+        if (camBtn) {
+            camBtn.title = isRear ? 'Switch to Front Camera' : 'Switch to Rear Camera';
+            camBtn.classList.toggle('active-rear', isRear);
+        }
+
+        if (State.mode === 'CAPTURE' && State.videoReady) {
+            if (isRear) {
+                if (statusText) statusText.innerText = 'REAR CAMERA • TAP TO CAPTURE';
+                if (captureInstruction) captureInstruction.classList.add('hidden');
+                if (manualCaptureBar) manualCaptureBar.classList.remove('hidden');
+                if (shutterLabel) shutterLabel.innerText = 'CAPTURE PHOTO';
+            } else {
+                if (statusText) statusText.innerText = 'FRONT CAM • GESTURE ACTIVE';
+                if (captureInstruction) captureInstruction.classList.remove('hidden');
+                if (manualCaptureBar) manualCaptureBar.classList.remove('hidden');
+                if (shutterLabel) shutterLabel.innerText = 'TAP OR PINCH';
+            }
         }
     },
     onResults(results) {
@@ -512,7 +582,6 @@ const VisionManager = {
             State.handLostFrames = 0;
             
             // --- SCALE-INVARIANT PINCH DETECTION ---
-            // Distance between wrist (0) and middle MCP (9) represents physical palm size
             const palmScale = Math.hypot(lm[9].x - lm[0].x, lm[9].y - lm[0].y) || 0.24;
             const pinchRatio = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y) / palmScale;
 
@@ -547,10 +616,11 @@ const VisionManager = {
             }
         }
     },
-    toggleCamera() {
-        // Switch between front (user) and rear (environment) camera
+    async toggleCamera() {
+        AudioEngine.playClick();
         State.cameraFacingMode = State.cameraFacingMode === 'user' ? 'environment' : 'user';
-        this.startCamera();
+        this.updateCameraModeUI();
+        await this.startCamera();
     }
 };
 
@@ -2114,12 +2184,6 @@ const UIManager = {
                 }
             });
         }
-        if (Els.photoSharingToggle) {
-            Els.photoSharingToggle.addEventListener('change', (e) => {
-                AudioEngine.playClick();
-                PhotoDeliveryManager.setPhotoSharing(e.target.checked);
-            });
-        }
 
         const resetToCapture = () => {
             HintManager.invalidate();
@@ -2138,7 +2202,7 @@ const UIManager = {
             // If camera stream is already running, switch to CAPTURE mode
             if (State.videoReady && Els.video.srcObject) {
                 State.mode = 'CAPTURE';
-                this.show('capture-instruction');
+                VisionManager.updateCameraModeUI();
             } else {
                 // Request camera permission and start video stream
                 VisionManager.init();
@@ -2152,7 +2216,16 @@ const UIManager = {
             Els.sound.setAttribute('data-muted', State.soundEnabled ? '0' : '1');
             AudioEngine.playClick(); 
         });
-        Els.cam.addEventListener('click', () => { AudioEngine.playClick(); VisionManager.toggleCamera(); });
+        Els.cam.addEventListener('click', () => { VisionManager.toggleCamera(); });
+        
+        // Manual Shutter Capture Button (For Rear Camera & Mobile Tap)
+        const manualCapBtn = document.getElementById('manual-capture-btn');
+        if (manualCapBtn) {
+            manualCapBtn.addEventListener('click', () => {
+                this.executeCapture();
+            });
+        }
+
         Els.fs.addEventListener('click', () => {
             try {
                 if (!document.fullscreenElement && !document.webkitFullscreenElement) {
@@ -2230,34 +2303,47 @@ const UIManager = {
             alert('Score copied to clipboard!');
         });
         
-        // Fallback Mouse & Touch for Drag & Drop
+        // Precision Touch & Mouse Drag & Drop
         const startDrag = (e) => {
             if(State.mode !== 'PLAYING') return;
-            if (e.cancelable && e.type.startsWith('touch')) {
-                e.preventDefault();
-            }
+            if (e.cancelable) e.preventDefault();
             const r = Els.canvas.getBoundingClientRect();
             let clientX = e.clientX, clientY = e.clientY;
-            if(e.touches && e.touches.length > 0) { clientX = e.touches[0].clientX; clientY = e.touches[0].clientY; }
+            if(e.touches && e.touches.length > 0) { 
+                clientX = e.touches[0].clientX; 
+                clientY = e.touches[0].clientY; 
+            } else if (e.changedTouches && e.changedTouches.length > 0) {
+                clientX = e.changedTouches[0].clientX; 
+                clientY = e.changedTouches[0].clientY; 
+            }
             
             State.hand.cx = (clientX - r.left) * (Els.canvas.width / r.width);
             State.hand.cy = (clientY - r.top) * (Els.canvas.height / r.height);
-            State.hand.isPinched = true; State.hand.exists = true; State.mouseFallback = true;
+            State.hand.isPinched = true; 
+            State.hand.exists = true; 
+            State.mouseFallback = true;
         };
         const moveDrag = (e) => {
-            if(!State.mouseFallback) return;
-            if (e.cancelable && e.type.startsWith('touch')) {
-                e.preventDefault();
-            }
+            if(!State.mouseFallback || State.mode !== 'PLAYING') return;
+            if (e.cancelable) e.preventDefault();
             const r = Els.canvas.getBoundingClientRect();
             let clientX = e.clientX, clientY = e.clientY;
-            if(e.touches && e.touches.length > 0) { clientX = e.touches[0].clientX; clientY = e.touches[0].clientY; }
+            if(e.touches && e.touches.length > 0) { 
+                clientX = e.touches[0].clientX; 
+                clientY = e.touches[0].clientY; 
+            } else if (e.changedTouches && e.changedTouches.length > 0) {
+                clientX = e.changedTouches[0].clientX; 
+                clientY = e.changedTouches[0].clientY; 
+            }
             
             State.hand.cx = (clientX - r.left) * (Els.canvas.width / r.width);
             State.hand.cy = (clientY - r.top) * (Els.canvas.height / r.height);
         };
         const endDrag = () => {
-            if(State.mouseFallback) { State.hand.isPinched = false; State.mouseFallback = false; }
+            if(State.mouseFallback) { 
+                State.hand.isPinched = false; 
+                State.mouseFallback = false; 
+            }
         };
         
         Els.canvas.addEventListener('mousedown', startDrag);
@@ -2266,8 +2352,8 @@ const UIManager = {
         
         Els.canvas.addEventListener('touchstart', startDrag, {passive: false});
         Els.canvas.addEventListener('touchmove', moveDrag, {passive: false});
-        window.addEventListener('touchend', endDrag, {passive: true});
-        window.addEventListener('touchcancel', endDrag, {passive: true});
+        window.addEventListener('touchend', endDrag, {passive: false});
+        window.addEventListener('touchcancel', endDrag, {passive: false});
 
         // Resize / Orientation Adaptation
         let resizeDebounce = null;
