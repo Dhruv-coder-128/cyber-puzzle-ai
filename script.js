@@ -830,14 +830,151 @@ const RenderEngine = {
         ctx.quadraticCurveTo(x, y, x + r, y);
         ctx.closePath();
     },
-    drawFrame() {
+    drawIdleBoard(timestamp) {
+        const b = PuzzleEngine.getBoardBounds();
+        const t = (timestamp || performance.now()) * 0.001;
+        const pulse = Math.sin(t * 1.5) * 0.5 + 0.5; // 0..1
+        const floatY = Math.sin(t * 1.2) * 2;
+        
+        Els.ctx.save();
+        
+        // 1. Outer Board Substrate (Dark glass container)
+        this.roundRect(Els.ctx, b.ox - 10, b.oy - 10, b.size + 20, b.size + 20, 24);
+        Els.ctx.fillStyle = 'rgba(16, 19, 21, 0.7)';
+        Els.ctx.fill();
+        Els.ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+        Els.ctx.lineWidth = 1;
+        Els.ctx.stroke();
+        
+        // Cyber Corner Brackets on the outer substrate
+        const bracketLen = Math.min(24, b.size * 0.06);
+        const bracketPad = 6;
+        Els.ctx.strokeStyle = 'rgba(99, 230, 190, 0.45)';
+        Els.ctx.lineWidth = 1.5;
+        Els.ctx.lineCap = 'round';
+        
+        // Top-Left
+        Els.ctx.beginPath();
+        Els.ctx.moveTo(b.ox - bracketPad, b.oy - bracketPad + bracketLen);
+        Els.ctx.lineTo(b.ox - bracketPad, b.oy - bracketPad);
+        Els.ctx.lineTo(b.ox - bracketPad + bracketLen, b.oy - bracketPad);
+        Els.ctx.stroke();
+        
+        // Top-Right
+        Els.ctx.beginPath();
+        Els.ctx.moveTo(b.ox + b.size + bracketPad - bracketLen, b.oy - bracketPad);
+        Els.ctx.lineTo(b.ox + b.size + bracketPad, b.oy - bracketPad);
+        Els.ctx.lineTo(b.ox + b.size + bracketPad, b.oy - bracketPad + bracketLen);
+        Els.ctx.stroke();
+        
+        // Bottom-Left
+        Els.ctx.beginPath();
+        Els.ctx.moveTo(b.ox - bracketPad, b.oy + b.size + bracketPad - bracketLen);
+        Els.ctx.lineTo(b.ox - bracketPad, b.oy + b.size + bracketPad);
+        Els.ctx.lineTo(b.ox - bracketPad + bracketLen, b.oy + b.size + bracketPad);
+        Els.ctx.stroke();
+        
+        // Bottom-Right
+        Els.ctx.beginPath();
+        Els.ctx.moveTo(b.ox + b.size + bracketPad - bracketLen, b.oy + b.size + bracketPad);
+        Els.ctx.lineTo(b.ox + b.size + bracketPad, b.oy + b.size + bracketPad);
+        Els.ctx.lineTo(b.ox + b.size + bracketPad, b.oy + b.size + bracketPad - bracketLen);
+        Els.ctx.stroke();
+        
+        // 2. Subtle 3x3 Geometric Puzzle Grid Silhouette
+        const gridN = 3;
+        const cellSize = b.size / gridN;
+        const pad = 6;
+        
+        for (let r = 0; r < gridN; r++) {
+            for (let c = 0; c < gridN; c++) {
+                const cellX = b.ox + c * cellSize + pad;
+                const cellY = b.oy + r * cellSize + pad;
+                const cellW = cellSize - pad * 2;
+                const cellH = cellSize - pad * 2;
+                
+                const isCenter = (r === 1 && c === 1);
+                const isCorner = ((r === 0 || r === 2) && (c === 0 || c === 2));
+                const dy = isCenter ? floatY : 0;
+                
+                this.roundRect(Els.ctx, cellX, cellY + dy, cellW, cellH, 14);
+                Els.ctx.fillStyle = isCenter ? 'rgba(24, 30, 33, 0.75)' : 'rgba(20, 24, 27, 0.55)';
+                Els.ctx.fill();
+                
+                // Delicate border
+                Els.ctx.strokeStyle = isCenter 
+                    ? `rgba(99, 230, 190, ${0.18 + pulse * 0.12})` 
+                    : (isCorner ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.03)');
+                Els.ctx.lineWidth = isCenter ? 1.4 : 1;
+                Els.ctx.stroke();
+                
+                // Micro technical accents in cells
+                if (!isCenter) {
+                    Els.ctx.beginPath();
+                    Els.ctx.arc(cellX + cellW / 2, cellY + cellH / 2, 2, 0, Math.PI * 2);
+                    Els.ctx.fillStyle = 'rgba(99, 230, 190, 0.18)';
+                    Els.ctx.fill();
+                }
+            }
+        }
+        
+        // 3. Center Ready-to-Play Content Presentation
+        const centerX = b.ox + b.size / 2;
+        const centerY = b.oy + b.size / 2;
+        
+        // Status Capsule Pill
+        const pillW = Math.min(136, b.size * 0.42);
+        const pillH = 26;
+        const pillY = centerY - 38 + floatY;
+        
+        this.roundRect(Els.ctx, centerX - pillW / 2, pillY, pillW, pillH, 13);
+        Els.ctx.fillStyle = 'rgba(16, 21, 23, 0.9)';
+        Els.ctx.fill();
+        Els.ctx.strokeStyle = `rgba(99, 230, 190, ${0.35 + pulse * 0.25})`;
+        Els.ctx.lineWidth = 1.2;
+        Els.ctx.stroke();
+        
+        // Pulsing Mint Status Indicator Dot
+        Els.ctx.beginPath();
+        Els.ctx.arc(centerX - pillW / 2 + 14, pillY + pillH / 2, 3.5, 0, Math.PI * 2);
+        Els.ctx.fillStyle = '#63E6BE';
+        Els.ctx.shadowColor = '#63E6BE';
+        Els.ctx.shadowBlur = 6 * pulse + 2;
+        Els.ctx.fill();
+        Els.ctx.shadowColor = 'transparent';
+        Els.ctx.shadowBlur = 0;
+        
+        // "READY TO PLAY" Text
+        Els.ctx.font = '600 11px Inter, -apple-system, BlinkMacSystemFont, sans-serif';
+        Els.ctx.fillStyle = '#E6ECE9';
+        Els.ctx.textAlign = 'left';
+        Els.ctx.textBaseline = 'middle';
+        Els.ctx.fillText('READY TO PLAY', centerX - pillW / 2 + 24, pillY + pillH / 2 + 0.5);
+        
+        // Primary Instruction: "Choose a puzzle or capture a photo"
+        Els.ctx.font = '500 13px Inter, -apple-system, BlinkMacSystemFont, sans-serif';
+        Els.ctx.fillStyle = '#A4B3AE';
+        Els.ctx.textAlign = 'center';
+        Els.ctx.textBaseline = 'middle';
+        Els.ctx.fillText('Choose a puzzle or capture a photo', centerX, centerY + 8 + floatY);
+        
+        // Secondary Hint: "Pinch to capture  •  Drag to solve"
+        Els.ctx.font = '400 11px Inter, -apple-system, BlinkMacSystemFont, sans-serif';
+        Els.ctx.fillStyle = 'rgba(99, 230, 190, 0.72)';
+        Els.ctx.fillText('Pinch to capture  •  Drag to solve', centerX, centerY + 30 + floatY);
+        
+        Els.ctx.restore();
+    },
+    drawFrame(timestamp) {
         if (!Els.ctx || Els.canvas.width === 0) return;
         Els.ctx.clearRect(0, 0, Els.canvas.width, Els.canvas.height);
         
-        // 1. We no longer draw the video frame manually in the canvas! The <video> element behind does it.
-        // This ensures the camera is always visible and drastically improves performance.
+        // 1. Idle Ready Board State (Active when waiting for user to start puzzle)
+        if (State.mode !== 'PLAYING' && State.mode !== 'SOLVED' && State.mode !== 'READY') {
+            this.drawIdleBoard(timestamp);
+        }
         
-        // 2. Puzzle Board Container
+        // 2. Active Puzzle Board Container
         if ((State.mode === 'PLAYING' || State.mode === 'SOLVED') && State.sourceImage) {
             const b = PuzzleEngine.getBoardBounds();
             const pad = 4;
@@ -905,43 +1042,128 @@ const RenderEngine = {
             });
         }
         
-        // 3. Hands & Interaction (High-Visibility Cyber Tech Overlay)
+        // 3. Hands & Interaction (High-Visibility Futuristic Interface Overlay)
         if (latestResults && latestResults.multiHandLandmarks) {
             Els.ctx.save();
             if (State.cameraFacingMode === 'user') {
                 Els.ctx.translate(Els.canvas.width, 0);
                 Els.ctx.scale(-1, 1);
             }
+            
+            const isPinched = State.hand.isPinched;
+            const isGrabbing = isPinched && State.selectedTile;
+            const t = (timestamp || performance.now()) * 0.001;
+            const pulse = Math.sin(t * 4) * 0.5 + 0.5;
+            
             for (const lm of latestResults.multiHandLandmarks) {
-                // High-contrast cyber-mint skeleton connections
-                if (typeof drawConnectors !== 'undefined') {
-                    const isPinched = State.hand.isPinched;
-                    const lineColor = isPinched ? 'rgba(99, 230, 190, 0.75)' : 'rgba(99, 230, 190, 0.45)';
-                    const lineWidth = isPinched ? 2.4 : 1.6;
-                    drawConnectors(Els.ctx, lm, HAND_CONNECTIONS, {color: lineColor, lineWidth: lineWidth});
+                // Skeleton connector lines with rounded joins & subtle glowing stroke
+                Els.ctx.lineCap = 'round';
+                Els.ctx.lineJoin = 'round';
+                
+                // Outer glow stroke behind connectors
+                Els.ctx.beginPath();
+                if (typeof HAND_CONNECTIONS !== 'undefined') {
+                    for (const [i, j] of HAND_CONNECTIONS) {
+                        if (lm[i] && lm[j]) {
+                            Els.ctx.moveTo(lm[i].x * Els.canvas.width, lm[i].y * Els.canvas.height);
+                            Els.ctx.lineTo(lm[j].x * Els.canvas.width, lm[j].y * Els.canvas.height);
+                        }
+                    }
+                }
+                Els.ctx.strokeStyle = isGrabbing 
+                    ? 'rgba(245, 184, 75, 0.25)' 
+                    : (isPinched ? 'rgba(99, 230, 190, 0.35)' : 'rgba(99, 230, 190, 0.2)');
+                Els.ctx.lineWidth = isPinched ? 3.5 : 2.6;
+                Els.ctx.stroke();
+                
+                // Core crisp connector line
+                Els.ctx.beginPath();
+                if (typeof HAND_CONNECTIONS !== 'undefined') {
+                    for (const [i, j] of HAND_CONNECTIONS) {
+                        if (lm[i] && lm[j]) {
+                            Els.ctx.moveTo(lm[i].x * Els.canvas.width, lm[i].y * Els.canvas.height);
+                            Els.ctx.lineTo(lm[j].x * Els.canvas.width, lm[j].y * Els.canvas.height);
+                        }
+                    }
+                }
+                Els.ctx.strokeStyle = isGrabbing 
+                    ? 'rgba(245, 184, 75, 0.85)' 
+                    : (isPinched ? 'rgba(99, 230, 190, 0.9)' : 'rgba(99, 230, 190, 0.65)');
+                Els.ctx.lineWidth = isPinched ? 2.0 : 1.5;
+                Els.ctx.stroke();
+                
+                // Active Pinch Proximity Ray between Thumb Tip (4) and Index Tip (8)
+                if (lm[4] && lm[8]) {
+                    const p4x = lm[4].x * Els.canvas.width;
+                    const p4y = lm[4].y * Els.canvas.height;
+                    const p8x = lm[8].x * Els.canvas.width;
+                    const p8y = lm[8].y * Els.canvas.height;
+                    
+                    Els.ctx.beginPath();
+                    Els.ctx.moveTo(p4x, p4y);
+                    Els.ctx.lineTo(p8x, p8y);
+                    Els.ctx.strokeStyle = isGrabbing 
+                        ? 'rgba(245, 184, 75, 0.95)' 
+                        : (isPinched ? 'rgba(99, 230, 190, 0.95)' : `rgba(99, 230, 190, ${0.25 + pulse * 0.2})`);
+                    Els.ctx.lineWidth = isPinched ? 2.8 : 1.4;
+                    Els.ctx.stroke();
                 }
                 
-                // Tech landmark joints
+                // Futuristic Joint Nodes with refined hierarchy
                 lm.forEach((pt, idx) => {
                     const px = pt.x * Els.canvas.width;
                     const py = pt.y * Els.canvas.height;
-                    const isFingertip = (idx === 4 || idx === 8);
+                    const isFingertipPinch = (idx === 4 || idx === 8);
+                    const isOtherFingertip = (idx === 12 || idx === 16 || idx === 20);
+                    const isWrist = (idx === 0);
                     
-                    // Outer halo
-                    Els.ctx.beginPath();
-                    Els.ctx.arc(px, py, isFingertip ? 6.5 : 4.5, 0, 2 * Math.PI);
-                    Els.ctx.fillStyle = State.hand.isPinched 
-                        ? (isFingertip ? 'rgba(245, 184, 75, 0.35)' : 'rgba(99, 230, 190, 0.28)')
-                        : 'rgba(99, 230, 190, 0.22)';
-                    Els.ctx.fill();
-                    
-                    // Core point
-                    Els.ctx.beginPath();
-                    Els.ctx.arc(px, py, isFingertip ? 3.5 : 2.5, 0, 2 * Math.PI);
-                    Els.ctx.fillStyle = State.hand.isPinched 
-                        ? (isFingertip ? '#F5B84B' : '#63E6BE') 
-                        : '#63E6BE';
-                    Els.ctx.fill();
+                    if (isFingertipPinch) {
+                        const haloR = isPinched ? 8.5 : 7.0;
+                        const coreR = isPinched ? 4.2 : 3.4;
+                        
+                        Els.ctx.beginPath();
+                        Els.ctx.arc(px, py, haloR, 0, 2 * Math.PI);
+                        Els.ctx.fillStyle = isGrabbing 
+                            ? 'rgba(245, 184, 75, 0.35)' 
+                            : (isPinched ? 'rgba(99, 230, 190, 0.35)' : 'rgba(99, 230, 190, 0.22)');
+                        Els.ctx.fill();
+                        
+                        Els.ctx.beginPath();
+                        Els.ctx.arc(px, py, coreR, 0, 2 * Math.PI);
+                        Els.ctx.fillStyle = isGrabbing ? '#F5B84B' : '#63E6BE';
+                        Els.ctx.fill();
+                    } else if (isOtherFingertip) {
+                        Els.ctx.beginPath();
+                        Els.ctx.arc(px, py, 5.5, 0, 2 * Math.PI);
+                        Els.ctx.fillStyle = 'rgba(99, 230, 190, 0.2)';
+                        Els.ctx.fill();
+                        
+                        Els.ctx.beginPath();
+                        Els.ctx.arc(px, py, 2.8, 0, 2 * Math.PI);
+                        Els.ctx.fillStyle = '#63E6BE';
+                        Els.ctx.fill();
+                    } else if (isWrist) {
+                        Els.ctx.beginPath();
+                        Els.ctx.arc(px, py, 5.0, 0, 2 * Math.PI);
+                        Els.ctx.strokeStyle = 'rgba(99, 230, 190, 0.65)';
+                        Els.ctx.lineWidth = 1.4;
+                        Els.ctx.stroke();
+                        
+                        Els.ctx.beginPath();
+                        Els.ctx.arc(px, py, 2.2, 0, 2 * Math.PI);
+                        Els.ctx.fillStyle = '#63E6BE';
+                        Els.ctx.fill();
+                    } else {
+                        Els.ctx.beginPath();
+                        Els.ctx.arc(px, py, 4.0, 0, 2 * Math.PI);
+                        Els.ctx.fillStyle = 'rgba(99, 230, 190, 0.18)';
+                        Els.ctx.fill();
+                        
+                        Els.ctx.beginPath();
+                        Els.ctx.arc(px, py, 2.2, 0, 2 * Math.PI);
+                        Els.ctx.fillStyle = '#63E6BE';
+                        Els.ctx.fill();
+                    }
                 });
             }
             Els.ctx.restore();
@@ -951,31 +1173,86 @@ const RenderEngine = {
         if ((State.mode === 'CAPTURE' || State.mode === 'PLAYING') && State.hand.exists) {
             const isGrabbing = State.hand.isPinched && State.selectedTile;
             const isPinching = State.hand.isPinched;
-            const radius = Math.max(Els.canvas.width, Els.canvas.height) * 0.035;
+            const radius = Math.max(Els.canvas.width, Els.canvas.height) * (isPinching ? 0.032 : 0.036);
+            const t = (timestamp || performance.now()) * 0.001;
+            const pulse = Math.sin(t * 5) * 0.5 + 0.5;
             
             Els.ctx.save();
-            // Outer Reticle
+            
+            // Outer Precision Reticle
             Els.ctx.beginPath();
             Els.ctx.arc(State.hand.cx, State.hand.cy, radius, 0, 2 * Math.PI);
             Els.ctx.strokeStyle = isGrabbing 
                 ? 'rgba(245, 184, 75, 0.95)' 
                 : (isPinching ? 'rgba(99, 230, 190, 0.95)' : 'rgba(99, 230, 190, 0.55)');
-            Els.ctx.lineWidth = isPinching ? 2.5 : 1.5;
+            Els.ctx.lineWidth = isPinching ? 2.4 : 1.5;
             Els.ctx.stroke();
             
-            // Inner glow/fill if active
+            // 4 Precision Crosshair Ticks
+            const tickDist = radius + 3;
+            const tickLen = 4;
+            Els.ctx.strokeStyle = isGrabbing 
+                ? 'rgba(245, 184, 75, 0.75)' 
+                : (isPinching ? 'rgba(99, 230, 190, 0.75)' : 'rgba(99, 230, 190, 0.4)');
+            Els.ctx.lineWidth = 1.2;
+            
+            // Top tick
+            Els.ctx.beginPath();
+            Els.ctx.moveTo(State.hand.cx, State.hand.cy - tickDist);
+            Els.ctx.lineTo(State.hand.cx, State.hand.cy - tickDist - tickLen);
+            Els.ctx.stroke();
+            // Bottom tick
+            Els.ctx.beginPath();
+            Els.ctx.moveTo(State.hand.cx, State.hand.cy + tickDist);
+            Els.ctx.lineTo(State.hand.cx, State.hand.cy + tickDist + tickLen);
+            Els.ctx.stroke();
+            // Left tick
+            Els.ctx.beginPath();
+            Els.ctx.moveTo(State.hand.cx - tickDist, State.hand.cy);
+            Els.ctx.lineTo(State.hand.cx - tickDist - tickLen, State.hand.cy);
+            Els.ctx.stroke();
+            // Right tick
+            Els.ctx.beginPath();
+            Els.ctx.moveTo(State.hand.cx + tickDist, State.hand.cy);
+            Els.ctx.lineTo(State.hand.cx + tickDist + tickLen, State.hand.cy);
+            Els.ctx.stroke();
+            
+            // Inner aura fill when pinched / grabbing
             if (isPinching) {
                 Els.ctx.beginPath();
                 Els.ctx.arc(State.hand.cx, State.hand.cy, radius, 0, 2 * Math.PI);
-                Els.ctx.fillStyle = isGrabbing ? 'rgba(245, 184, 75, 0.15)' : 'rgba(99, 230, 190, 0.15)';
+                Els.ctx.fillStyle = isGrabbing 
+                    ? `rgba(245, 184, 75, ${0.14 + pulse * 0.08})` 
+                    : `rgba(99, 230, 190, ${0.14 + pulse * 0.08})`;
                 Els.ctx.fill();
             }
             
             // Center Focal Node
             Els.ctx.beginPath();
-            Els.ctx.arc(State.hand.cx, State.hand.cy, isPinching ? 4.5 : 3.5, 0, 2 * Math.PI);
+            Els.ctx.arc(State.hand.cx, State.hand.cy, isPinching ? 4.2 : 3.2, 0, 2 * Math.PI);
             Els.ctx.fillStyle = isGrabbing ? '#F5B84B' : '#63E6BE';
             Els.ctx.fill();
+            
+            // Subtle "GRAB" tag pill when holding a tile
+            if (isGrabbing) {
+                const tagW = 44;
+                const tagH = 16;
+                const tagX = State.hand.cx + radius + 6;
+                const tagY = State.hand.cy - tagH / 2;
+                
+                this.roundRect(Els.ctx, tagX, tagY, tagW, tagH, 4);
+                Els.ctx.fillStyle = 'rgba(16, 19, 21, 0.88)';
+                Els.ctx.fill();
+                Els.ctx.strokeStyle = '#F5B84B';
+                Els.ctx.lineWidth = 1;
+                Els.ctx.stroke();
+                
+                Els.ctx.font = '700 9px Inter, -apple-system, sans-serif';
+                Els.ctx.fillStyle = '#F5B84B';
+                Els.ctx.textAlign = 'center';
+                Els.ctx.textBaseline = 'middle';
+                Els.ctx.fillText('GRAB', tagX + tagW / 2, tagY + tagH / 2 + 0.5);
+            }
             
             Els.ctx.restore();
         }
@@ -1120,7 +1397,7 @@ function gameLoop(timestamp) {
     updateCanvasDimensions();
     
     updateLogic(dt);
-    RenderEngine.drawFrame();
+    RenderEngine.drawFrame(timestamp);
     requestAnimationFrame(gameLoop);
 }
 
