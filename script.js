@@ -395,6 +395,7 @@ const VisionManager = {
 const GalleryManager = {
     init() {
         this.renderGalleryGrid();
+        this.bindGalleryEvents();
     },
     renderGalleryGrid() {
         if (!Els.galleryGrid) return;
@@ -406,18 +407,30 @@ const GalleryManager = {
                 <div class="gallery-item-label">${p.title}</div>
             </div>
         `).join('');
-
-        Els.galleryGrid.querySelectorAll('.gallery-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const id = parseInt(item.dataset.id);
+    },
+    bindGalleryEvents() {
+        if (!Els.galleryGrid) return;
+        
+        // Event delegation on the grid container for 100% reliable clicks
+        Els.galleryGrid.addEventListener('click', (e) => {
+            const item = e.target.closest('.gallery-item');
+            if (!item) return;
+            const id = parseInt(item.dataset.id, 10);
+            if (id) {
                 this.selectPuzzle(id);
-            });
-            item.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    const id = parseInt(item.dataset.id);
+            }
+        });
+
+        Els.galleryGrid.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                const item = e.target.closest('.gallery-item');
+                if (!item) return;
+                const id = parseInt(item.dataset.id, 10);
+                if (id) {
+                    e.preventDefault();
                     this.selectPuzzle(id);
                 }
-            });
+            }
         });
     },
     selectPuzzle(id) {
@@ -430,7 +443,7 @@ const GalleryManager = {
 
         // Update active class in gallery
         document.querySelectorAll('.gallery-item').forEach(el => {
-            el.classList.toggle('active', parseInt(el.dataset.id) === id);
+            el.classList.toggle('active', parseInt(el.dataset.id, 10) === id);
         });
 
         // Close gallery modal
@@ -440,17 +453,12 @@ const GalleryManager = {
         this.loadPredefinedPuzzle(puzzle);
     },
     loadPredefinedPuzzle(puzzle) {
+        if (!puzzle || !puzzle.src) return;
         UIManager.show('loading-indicator');
+
         const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = async () => {
-            try {
-                if (img.decode) {
-                    await img.decode();
-                }
-            } catch (e) {
-                // Ignore decode catch if already rendered
-            }
+
+        const onImageReady = () => {
             UIManager.hide('loading-indicator');
             State.sourceImage = img;
             State.selectedPuzzleId = puzzle.id;
@@ -458,13 +466,27 @@ const GalleryManager = {
             
             // Setup canvas/dimensions and mini preview directly from native image
             PuzzleEngine.setupCanvasFromImage(img);
+            
+            // Show Ready screen with preview and Start button
             UIManager.showReadyScreen(puzzle.title);
         };
-        img.onerror = () => {
-            UIManager.hide('loading-indicator');
-            console.error(`Failed to load ${puzzle.title} from ${puzzle.src}`);
+
+        img.onload = () => {
+            onImageReady();
         };
+
+        img.onerror = (err) => {
+            UIManager.hide('loading-indicator');
+            console.error(`[Gallery] Failed to load ${puzzle.title} from ${puzzle.src}`, err);
+        };
+
+        // Assign src directly without crossOrigin (same-origin repository asset)
         img.src = puzzle.src;
+
+        // Handle cached images immediately
+        if (img.complete && img.naturalWidth > 0) {
+            onImageReady();
+        }
     }
 };
 
