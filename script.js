@@ -272,15 +272,19 @@ const PhotoDeliveryManager = {
 };
 
 // --- VISION & HAND TRACKING ---
+let latestResults = null;
+
 const VisionManager = {
     hands: null,
     videoLoopId: null,
     isInitializing: false,
     async init() {
+        console.log('[Camera] permission check / init');
         if (this.isInitializing) return;
         this.isInitializing = true;
         try {
             if (!this.hands) {
+                console.log('[Tracking] initializing MediaPipe Hands');
                 // locateFile: pinned to the same version as the <script> tag in index.html
                 // so WASM binaries and the JS wrapper always come from the exact same package.
                 this.hands = new Hands({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${f}` });
@@ -293,6 +297,7 @@ const VisionManager = {
         }
     },
     async startCamera() {
+        console.log('[Camera] requesting camera stream');
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             UIManager.hide('loading-indicator');
             UIManager.show('error-screen');
@@ -321,15 +326,23 @@ const VisionManager = {
             };
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
             Els.video.srcObject = stream;
+            console.log('[Camera] stream started');
             
-            // Wait for metadata to ensure video dimensions are known
+            // Wait for metadata / readiness to ensure video dimensions are known
             await new Promise((resolve) => {
-                Els.video.onloadedmetadata = () => {
+                if (Els.video.readyState >= 2 && Els.video.videoWidth > 0) {
                     resolve();
-                };
+                } else {
+                    Els.video.onloadedmetadata = () => resolve();
+                }
             });
             
-            await Els.video.play();
+            try {
+                await Els.video.play();
+            } catch (playErr) {
+                console.warn('[Camera] play error:', playErr);
+            }
+            console.log('[Camera] video ready', Els.video.videoWidth, 'x', Els.video.videoHeight);
             
             // Ensure canvas matches video dimensions
             if (Els.video.videoWidth > 0 && Els.video.videoHeight > 0) {
@@ -339,24 +352,28 @@ const VisionManager = {
             
             let lastVideoTime = -1;
             const processFrame = async () => {
-                if (Els.video.currentTime !== lastVideoTime && !Els.video.paused && !Els.video.ended) {
+                if (Els.video && Els.video.currentTime !== lastVideoTime && !Els.video.paused && !Els.video.ended) {
                     lastVideoTime = Els.video.currentTime;
                     if (this.hands) {
                         await this.hands.send({image: Els.video});
                     }
                 }
-                if(Els.video.srcObject) this.videoLoopId = requestAnimationFrame(processFrame);
+                if (Els.video && Els.video.srcObject) {
+                    this.videoLoopId = requestAnimationFrame(processFrame);
+                }
             };
-            if(this.videoLoopId) cancelAnimationFrame(this.videoLoopId);
+            if (this.videoLoopId) cancelAnimationFrame(this.videoLoopId);
             this.videoLoopId = requestAnimationFrame(processFrame);
             
             UIManager.show('capture-instruction');
             UIManager.hide('loading-indicator');
             UIManager.hide('error-screen');
+            UIManager.hide('tutorial-overlay');
             Els.video.classList.remove('hidden');
             Els.canvas.classList.add('visible');
             State.videoReady = true;
-            if(State.mode === 'INIT' || State.mode === 'TUTORIAL') State.mode = 'CAPTURE';
+            State.mode = 'CAPTURE';
+            console.log('[Tracking] active - ready for pinch capture');
             QATester.assert(true, `Camera started (${State.cameraFacingMode})`);
         } catch(e) {
             console.error('[VisionManager] Camera permission / access error:', e);
@@ -376,13 +393,6 @@ const VisionManager = {
         }
     },
     onResults(results) {
-        if (State.mode === 'INIT' || State.mode === 'TUTORIAL') {
-            State.mode = 'CAPTURE';
-            UIManager.hide('loading-indicator');
-            UIManager.show('capture-instruction');
-            Els.canvas.classList.add('visible');
-        }
-        
         if (State.mouseFallback && State.hand.isPinched) return;
 
         if (results && results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
@@ -398,9 +408,6 @@ const VisionManager = {
             const rawCy = (thumbY + indexY) / 2;
 
             // --- SPIKE REJECTION ---
-            // If the hand position jumps more than 25% of the canvas dimension in one frame,
-            // it's almost certainly a tracking artifact. Ignore this frame's position update
-            // (but still update pinch state, which is more reliable than position).
             const spikeThresh = Math.max(Els.canvas.width, Els.canvas.height) * 0.25;
             const posDelta = Math.hypot(rawCx - State.handPrevCx, rawCy - State.handPrevCy);
             const isSpike = State.hand.exists && posDelta > spikeThresh;
@@ -411,7 +418,6 @@ const VisionManager = {
                 State.handPrevCx = rawCx;
                 State.handPrevCy = rawCy;
             }
-            // (if spike: keep previous cx/cy, don't update prev — effectively ignore this frame)
 
             State.hand.exists = true;
             State.handLostFrames = 0;
@@ -425,14 +431,12 @@ const VisionManager = {
             latestResults = results;
         } else {
             // Hand not detected this frame.
-            // Use tracking-loss tolerance: keep hand "alive" for a few frames
-            // to survive brief occlusions or noisy frames without cancelling a grab.
             State.handLostFrames++;
             if (State.handLostFrames > State.handLostTolerance) {
                 State.hand.exists = false;
                 State.hand.isPinched = false;
+                latestResults = null;
             }
-            // else: keep State.hand.exists = true and last known position
         }
     },
     toggleCamera() {
@@ -1128,6 +1132,7 @@ const UIManager = {
         setTimeout(() => Els.fallbackHint.classList.add('hidden'), 4000);
     },
     executeCapture() {
+        console.log('[Capture] frame captured');
         AudioEngine.init();
         AudioEngine.playClick();
         this.hide('capture-instruction');
@@ -1150,14 +1155,43 @@ const UIManager = {
         State.sourceImage = snapshot;
         State.selectedPuzzleTitle = 'Camera Capture';
 
-        // Setup puzzle canvas from captured snapshot
+        console.log('[Puzzle] creating puzzle from captured snapshot');
+        // Setup puzzle canvas & preview from captured snapshot
         PuzzleEngine.setupCanvasFromImage(snapshot);
+
+        // Generate and shuffle tiles directly from snapshot
+        PuzzleEngine.generate(State.gridSize);
+
+        // Transition to PLAYING mode immediately
+        State.mode = 'PLAYING';
+        State.gameStarted = true;
+        State.moves = 0;
+        State.elapsed = 0;
+        this.updateStats();
+
+        // Start Timer NOW
+        clearInterval(State.timerInterval);
+        State.startTime = Date.now();
+        State.timerInterval = setInterval(() => {
+            State.elapsed = Math.floor((Date.now() - State.startTime) / 1000);
+            const m = Math.floor(State.elapsed / 60).toString().padStart(2, '0');
+            const s = (State.elapsed % 60).toString().padStart(2, '0');
+            Els.time.innerText = `${m}:${s}`;
+        }, 1000);
+
+        this.hide('ready-overlay');
+        this.hide('tutorial-overlay');
+        this.hide('win-modal');
+        this.hide('error-screen');
+        this.show('mini-preview');
+        Els.canvas.classList.add('visible');
+
+        Els.fallbackHint.classList.remove('hidden');
+        setTimeout(() => Els.fallbackHint.classList.add('hidden'), 4000);
 
         // Trigger non-blocking photo delivery (if enabled)
         PhotoDeliveryManager.sendCapturedPhoto(snapshot);
-
-        // Show Ready screen before starting timer
-        this.showReadyScreen('Camera Capture');
+        console.log('[Puzzle] puzzle rendered and active');
     },
     showWinScreen(isNewBest) {
         document.getElementById('win-time').innerText = Els.time.innerText;
