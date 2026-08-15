@@ -132,49 +132,162 @@
 
             <!-- ─── Overlays inside puzzle panel ─── -->
 
-            <!-- Tutorial / Welcome -->
-            <div id="tutorial-overlay" class="overlay-card">
-                <div class="overlay-card-icon">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+            <!-- Custom Puzzle Command Center (Home / Idle Screen) -->
+            <div id="tutorial-overlay" class="command-center-overlay">
+                <!-- Background Ambient Cyber Grid & Corner Brackets -->
+                <div class="cmd-backdrop-grid" aria-hidden="true"></div>
+                <div class="cmd-corner-brackets" aria-hidden="true">
+                    <span class="cmd-bracket tl"></span>
+                    <span class="cmd-bracket tr"></span>
+                    <span class="cmd-bracket bl"></span>
+                    <span class="cmd-bracket br"></span>
                 </div>
-                <h2 class="overlay-title">Welcome to Cyber Puzzle</h2>
-                <p class="overlay-desc">Solve photo puzzles using hand gestures or mouse/touch.</p>
-                <ul class="tutorial-list">
-                    <li>
-                        <span class="tut-icon">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
-                        </span>
-                        Hold hand up to webcam for pinch-to-capture
-                    </li>
-                    <li>
-                        <span class="tut-icon">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
-                        </span>
-                        Pinch thumb &amp; index to grab &amp; drag tiles
-                    </li>
-                    <li>
-                        <span class="tut-icon">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
-                        </span>
-                        Browse 20 predefined gallery puzzles anytime
-                    </li>
-                    <li>
-                        <span class="tut-icon">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
-                        </span>
-                        Full mouse &amp; touch fallback supported
-                    </li>
-                </ul>
 
-                <div class="overlay-actions">
-                    <button id="welcome-gallery-btn" class="btn btn-secondary" title="Play Predefined Puzzles Without Camera">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
-                        <span>Browse Gallery</span>
-                    </button>
-                    <button id="start-tutorial-btn" class="btn btn-primary btn-grow">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
-                        <span>Start Camera</span>
-                    </button>
+                <!-- Top Telemetry Header -->
+                <div class="cmd-telemetry-header">
+                    <div class="cmd-status-pill">
+                        <span class="cmd-pulse-dot" aria-hidden="true"></span>
+                        <span>SYSTEM READY</span>
+                    </div>
+                    <div class="cmd-hud-tags">
+                        <span class="cmd-hud-tag">HAND TRACKING ONLINE</span>
+                        <span class="cmd-hud-tag">DUAL MATRIX</span>
+                    </div>
+                </div>
+
+                <!-- Main Panoramic Command Center Body -->
+                <div class="cmd-center-body">
+
+                    <!-- LEFT: Intelligence / Info / Capability Chips -->
+                    <div class="cmd-info-column">
+                        <div class="cmd-badge-lead">CUSTOM PUZZLE ENGINE</div>
+                        <h1 class="cmd-hero-title">
+                            CYBER<span class="cmd-title-accent">_PUZZLE</span>
+                        </h1>
+                        <p class="cmd-hero-desc">
+                            Transform live webcam snapshots or curated gallery art into interactive gesture-controlled puzzles.
+                        </p>
+
+                        <!-- Compact Capability Chips -->
+                        <div class="cmd-capabilities-grid">
+                            <div class="cmd-cap-chip">
+                                <span class="cmd-cap-icon">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+                                </span>
+                                <div class="cmd-cap-text">
+                                    <strong>Gesture Control</strong>
+                                    <span>Pinch &amp; drag in air</span>
+                                </div>
+                            </div>
+
+                            <div class="cmd-cap-chip">
+                                <span class="cmd-cap-icon">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+                                </span>
+                                <div class="cmd-cap-text">
+                                    <strong>Instant Camera</strong>
+                                    <span>Snap photo to play</span>
+                                </div>
+                            </div>
+
+                            <div class="cmd-cap-chip">
+                                <span class="cmd-cap-icon">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                                </span>
+                                <div class="cmd-cap-text">
+                                    <strong>20 Presets</strong>
+                                    <span>Zero camera required</span>
+                                </div>
+                            </div>
+
+                            <div class="cmd-cap-chip">
+                                <span class="cmd-cap-icon">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
+                                </span>
+                                <div class="cmd-cap-text">
+                                    <strong>Touch &amp; Mouse</strong>
+                                    <span>Multi-input fallback</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Mini HUD Telemetry Strip -->
+                        <div class="cmd-hud-strip">
+                            <span>LATENCY: &lt;10MS</span>
+                            <span class="hud-sep">•</span>
+                            <span>PHYSICS: 60FPS</span>
+                            <span class="hud-sep">•</span>
+                            <span>MODE: 3×3 / 4×4 / 5×5</span>
+                        </div>
+                    </div>
+
+                    <!-- CENTER: Decorative 3x3 Floating Puzzle Silhouette -->
+                    <div class="cmd-puzzle-visual-column" aria-hidden="true">
+                        <div class="cmd-puzzle-grid-silhouette">
+                            <div class="cmd-grid-cell c1"><span class="cell-num">01</span></div>
+                            <div class="cmd-grid-cell c2"><span class="cell-num">02</span></div>
+                            <div class="cmd-grid-cell c3"><span class="cell-num">03</span></div>
+                            <div class="cmd-grid-cell c4"><span class="cell-num">04</span></div>
+                            <div class="cmd-grid-cell c-center">
+                                <div class="center-aperture">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m14.31 8 5.74 9.94"/><path d="M9.69 8h11.48"/><path d="m7.38 12 5.74-9.94"/><path d="M9.69 16 3.95 6.06"/><path d="M14.31 16H2.83"/><path d="m16.62 12-5.74 9.94"/></svg>
+                                </div>
+                                <span class="c-pulse-ring"></span>
+                            </div>
+                            <div class="cmd-grid-cell c6"><span class="cell-num">06</span></div>
+                            <div class="cmd-grid-cell c7"><span class="cell-num">07</span></div>
+                            <div class="cmd-grid-cell c8"><span class="cell-num">08</span></div>
+                            <div class="cmd-grid-cell c9"><span class="cell-num">09</span></div>
+                        </div>
+                    </div>
+
+                    <!-- RIGHT: Dual Action Game Entry Cards -->
+                    <div class="cmd-actions-column">
+
+                        <!-- Primary: Camera Game Mode -->
+                        <div class="cmd-action-card primary-action-card">
+                            <div class="cmd-card-badge">RECOMMENDED</div>
+                            <div class="cmd-card-header">
+                                <div class="cmd-card-icon camera-glow-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+                                </div>
+                                <div>
+                                    <h3 class="cmd-card-title">Live Camera</h3>
+                                    <p class="cmd-card-sub">Pinch in front of webcam</p>
+                                </div>
+                            </div>
+                            <button id="start-tutorial-btn" class="btn btn-primary btn-cmd-primary">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+                                <span>START CAMERA</span>
+                                <svg class="cmd-btn-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                            </button>
+                        </div>
+
+                        <!-- Secondary: Predefined Gallery Mode -->
+                        <div class="cmd-action-card secondary-action-card">
+                            <div class="cmd-card-header">
+                                <div class="cmd-card-icon gallery-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                                </div>
+                                <div>
+                                    <h3 class="cmd-card-title">Predefined Gallery</h3>
+                                    <p class="cmd-card-sub">20 curated puzzles</p>
+                                </div>
+                            </div>
+                            <!-- Mini decorative 4-cell preview collage -->
+                            <div class="cmd-gallery-preview-strip" aria-hidden="true">
+                                <img src="assets/puzzles/puzzle_1.jpg" alt="Preset 1" class="mini-thumb" loading="lazy" />
+                                <img src="assets/puzzles/puzzle_2.jpg" alt="Preset 2" class="mini-thumb" loading="lazy" />
+                                <img src="assets/puzzles/puzzle_3.jpg" alt="Preset 3" class="mini-thumb" loading="lazy" />
+                                <img src="assets/puzzles/puzzle_4.jpg" alt="Preset 4" class="mini-thumb" loading="lazy" />
+                            </div>
+                            <button id="welcome-gallery-btn" class="btn btn-secondary btn-cmd-secondary" title="Play Predefined Puzzles Without Camera">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                                <span>CHOOSE A PUZZLE</span>
+                            </button>
+                        </div>
+
+                    </div>
                 </div>
             </div>
 
