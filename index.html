@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CYBER_PUZZLE.AI — Hand-Tracked Sliding Puzzle</title>
+    <meta name="description" content="An AI-powered sliding puzzle game controlled by hand gestures through your webcam. Pinch to capture, drag to solve.">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+
+    <!-- MediaPipe: pinned to specific version so JS wrapper and WASM binaries always match -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3.1675466124/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+    <!-- Subtle film grain texture overlay -->
+    <div class="film-grain"></div>
+
+    <!-- ═══════════════════════════════════════════════
+         HEADER / NAVIGATION
+    ════════════════════════════════════════════════ -->
+    <header class="app-header">
+        <div class="header-inner">
+
+            <!-- Brand -->
+            <div class="logo">
+                <svg class="logo-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <rect x="3" y="3" width="7" height="7" rx="2" stroke="#F5F5F3" stroke-width="1.8"/>
+                    <rect x="14" y="3" width="7" height="7" rx="2" stroke="#F5F5F3" stroke-width="1.8"/>
+                    <rect x="3" y="14" width="7" height="7" rx="2" stroke="#F5F5F3" stroke-width="1.8"/>
+                    <rect x="14" y="14" width="7" height="7" rx="2" fill="#F5F5F3"/>
+                </svg>
+                <span class="logo-text">CYBER_PUZZLE<span class="logo-accent">.AI</span></span>
+            </div>
+
+            <!-- HUD Stats — center -->
+            <div class="hud-stats">
+                <div class="stat-item">
+                    <span class="stat-label">TIME</span>
+                    <span id="time-display" class="stat-value">00:00</span>
+                </div>
+                <div class="stat-divider" aria-hidden="true"></div>
+                <div class="stat-item">
+                    <span class="stat-label">MOVES</span>
+                    <span id="move-display" class="stat-value">0</span>
+                </div>
+                <div class="stat-divider" aria-hidden="true"></div>
+                <div class="stat-item">
+                    <span class="stat-label">BEST</span>
+                    <span id="best-display" class="stat-value">--</span>
+                </div>
+            </div>
+
+            <!-- Controls — right -->
+            <div class="controls">
+                <!-- Grid selector -->
+                <select id="difficulty-select" class="btn btn-ghost select-ctrl" title="Grid Size" aria-label="Grid Size">
+                    <option value="3">3×3</option>
+                    <option value="4">4×4</option>
+                    <option value="5">5×5</option>
+                </select>
+
+                <!-- Icon controls -->
+                <button id="undo-btn" class="btn btn-icon" title="Undo Move (Z)" aria-label="Undo">
+                    <!-- Undo icon -->
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+                </button>
+
+                <button id="hint-btn" class="btn btn-icon" title="Show Hint (H)" aria-label="Hint">
+                    <!-- Lightbulb icon -->
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
+                </button>
+
+                <button id="sound-btn" class="btn btn-icon" title="Toggle Sound" aria-label="Sound">
+                    <!-- Volume icon -->
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                </button>
+
+                <button id="cam-btn" class="btn btn-icon" title="Switch Camera" aria-label="Switch Camera">
+                    <!-- Camera flip icon -->
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7h-3a2 2 0 0 1-2-2V3"/><path d="M9 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3"/><path d="m14 3 6 4-6 4V3z"/><path d="m10 17-6-4 6-4v8z"/></svg>
+                </button>
+
+                <button id="fullscreen-btn" class="btn btn-icon" title="Fullscreen" aria-label="Fullscreen">
+                    <!-- Fullscreen icon -->
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+                </button>
+
+                <div class="controls-separator" aria-hidden="true"></div>
+
+                <button id="restart-btn" class="btn btn-secondary">Restart</button>
+                <button id="new-capture-btn" class="btn btn-primary">
+                    <!-- Camera icon -->
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+                    New Capture
+                </button>
+            </div>
+
+        </div>
+    </header>
+
+    <!-- ═══════════════════════════════════════════════
+         DEBUG QA PANEL (unchanged from original)
+    ════════════════════════════════════════════════ -->
+    <div id="debug-panel" class="glass-card hidden">
+        <h3 class="debug-header">QA Diagnostics <span id="fps-display">60 FPS</span></h3>
+        <div id="qa-log" class="debug-log"></div>
+    </div>
+
+    <!-- Fallback drag hint -->
+    <div id="fallback-hint" class="hint-text hidden">
+        Drag and Drop tiles to swap them.
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         MAIN EXPERIENCE — Two-column layout
+    ════════════════════════════════════════════════ -->
+    <main class="main-container">
+
+        <!-- LEFT: Puzzle canvas -->
+        <div class="puzzle-panel">
+            <canvas id="output-canvas"></canvas>
+
+            <!-- ─── Overlays inside puzzle panel ─── -->
+
+            <!-- Tutorial / Welcome -->
+            <div id="tutorial-overlay" class="overlay-card">
+                <div class="overlay-card-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+                </div>
+                <h2 class="overlay-title">Welcome to Cyber Puzzle</h2>
+                <p class="overlay-desc">Control the game with your webcam using hand gestures.</p>
+                <ul class="tutorial-list">
+                    <li>
+                        <span class="tut-icon">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+                        </span>
+                        Hold hand up to webcam
+                    </li>
+                    <li>
+                        <span class="tut-icon">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+                        </span>
+                        Pinch thumb &amp; index to grab
+                    </li>
+                    <li>
+                        <span class="tut-icon">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                        </span>
+                        Drag and Drop to swap tiles
+                    </li>
+                    <li>
+                        <span class="tut-icon">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
+                        </span>
+                        Mouse &amp; Touch fallback supported
+                    </li>
+                </ul>
+                <div class="overlay-actions">
+                    <button id="debug-toggle-btn" class="btn btn-secondary btn-sm" title="Toggle QA Panel">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 0-14.14 0"/><path d="M4.93 19.07a10 10 0 0 0 14.14 0"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.22 4.22 1.42 1.42"/><path d="m18.36 18.36 1.42 1.42"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m4.22 19.78 1.42-1.42"/><path d="m18.36 5.64 1.42-1.42"/></svg>
+                        Diagnostics
+                    </button>
+                    <button id="start-tutorial-btn" class="btn btn-primary btn-grow">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+                        Initialize Camera
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading indicator -->
+            <div id="loading-indicator" class="overlay-card hidden">
+                <div class="spinner" aria-label="Loading"></div>
+                <h2 class="overlay-title skeleton-text">Loading Model...</h2>
+                <p class="overlay-desc skeleton-text-small">Connecting to local stream</p>
+            </div>
+
+            <!-- Error screen -->
+            <div id="error-screen" class="overlay-card hidden">
+                <div class="overlay-card-icon error-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                </div>
+                <h2 class="overlay-title error-text">Camera Error</h2>
+                <p id="error-msg" class="overlay-desc">Could not access webcam.</p>
+                <button id="retry-cam-btn" class="btn btn-secondary margin-top">Retry Connection</button>
+            </div>
+
+            <!-- Win modal -->
+            <div id="win-modal" class="modal-overlay hidden">
+                <div class="success-card">
+                    <div class="icon-success">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    </div>
+                    <h2>Puzzle Solved</h2>
+                    <div class="win-metrics">
+                        <div class="metric">
+                            <span>Time</span>
+                            <strong id="win-time">00:00</strong>
+                        </div>
+                        <div class="divider"></div>
+                        <div class="metric">
+                            <span>Moves</span>
+                            <strong id="win-moves">0</strong>
+                        </div>
+                    </div>
+                    <div id="achievement-banner" class="achievement-banner hidden">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+                        New Best Score
+                    </div>
+                    <div class="modal-actions">
+                        <button id="play-again-btn" class="btn btn-primary">Play Again</button>
+                        <button id="win-new-capture-btn" class="btn btn-secondary">New Capture</button>
+                    </div>
+                    <div class="modal-actions" style="margin-top: 8px;">
+                        <button id="download-btn" class="btn btn-secondary">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            Save Image
+                        </button>
+                        <button id="share-btn" class="btn btn-secondary">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                            Copy Score
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /puzzle-panel -->
+
+        <!-- RIGHT: Camera + controls sidebar -->
+        <aside class="camera-sidebar">
+
+            <!-- Camera panel -->
+            <div class="camera-panel">
+                <div class="camera-panel-header">
+                    <span class="panel-label">LIVE CAMERA</span>
+                    <span class="camera-status">
+                        <span class="status-dot" aria-hidden="true"></span>
+                        HAND TRACKING ACTIVE
+                    </span>
+                </div>
+
+
+                <!-- Camera viewport — contains the live video feed + capture overlay -->
+                <div class="camera-viewport" aria-label="Camera feed with hand tracking overlay">
+                    <!-- video element here so MediaPipe input and visual display are the same element -->
+                    <video id="input-video" class="camera-video" playsinline autoplay muted></video>
+
+                    <!-- Pinch-to-capture instruction overlay (floats above video) -->
+                    <div id="capture-instruction" class="capture-overlay hidden">
+                        <div class="capture-overlay-inner">
+                            <div class="progress-ring-container">
+                                <svg class="progress-ring" width="64" height="64" aria-hidden="true">
+                                    <circle class="progress-ring-track" cx="32" cy="32" r="28" fill="none" stroke-width="3"/>
+                                    <circle class="progress-ring-circle" cx="32" cy="32" r="28" fill="none" stroke-width="3"/>
+                                </svg>
+                                <div class="pinch-dot" aria-hidden="true"></div>
+                            </div>
+                            <p class="capture-title">PINCH TO CAPTURE</p>
+                            <p class="capture-desc">Bring thumb + index together</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mini preview (captured image) -->
+            <div id="mini-preview" class="preview-panel hidden">
+                <div class="panel-label-row">
+                    <span class="panel-label">CAPTURED IMAGE</span>
+                </div>
+                <canvas id="preview-canvas"></canvas>
+            </div>
+
+        </aside>
+
+    </main>
+
+    <!-- Fallback drag hint (bottom center, unchanged positioning) -->
+
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+    <!-- Cyberpunk geometric outer shape -->
+    <polygon points="50,5 95,25 95,75 50,95 5,75 5,25" fill="none" stroke="#00f3ff" stroke-width="4"/>
+    <!-- Inner glowing node tracks -->
+    <path d="M50,5 L50,95 M5,25 L95,75 M95,25 L5,75" stroke="rgba(188, 19, 254, 0.5)" stroke-width="2"/>
+    <!-- Core -->
+    <circle cx="50" cy="50" r="15" fill="#bc13fe"/>
+</svg>
