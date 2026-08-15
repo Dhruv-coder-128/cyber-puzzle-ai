@@ -62,10 +62,9 @@ const State = {
     smoothDragX: 0,
     smoothDragY: 0,
     
-    // Rendering & Active Image
+    // Rendering & Active Source Image (Native Full Resolution Image or Raw Snapshot)
     videoReady: false,
-    sourceImage: null, // Image or Canvas source
-    capturedImageCanvas: null,
+    sourceImage: null, // HTMLImageElement or HTMLCanvasElement at native resolution
     selectedPuzzleId: 1,
     selectedPuzzleTitle: 'Puzzle 01',
     confetti: [],
@@ -437,15 +436,27 @@ const GalleryManager = {
         // Close gallery modal
         UIManager.hide('gallery-modal');
 
-        // Load image and show ready screen
-        this.loadPuzzleImage(puzzle);
+        // Load image and show ready screen via single canonical pipeline
+        this.loadPredefinedPuzzle(puzzle);
     },
-    loadPuzzleImage(puzzle) {
+    loadPredefinedPuzzle(puzzle) {
         UIManager.show('loading-indicator');
         const img = new Image();
-        img.onload = () => {
+        img.crossOrigin = 'anonymous';
+        img.onload = async () => {
+            try {
+                if (img.decode) {
+                    await img.decode();
+                }
+            } catch (e) {
+                // Ignore decode catch if already rendered
+            }
             UIManager.hide('loading-indicator');
             State.sourceImage = img;
+            State.selectedPuzzleId = puzzle.id;
+            State.selectedPuzzleTitle = puzzle.title;
+            
+            // Setup canvas/dimensions and mini preview directly from native image
             PuzzleEngine.setupCanvasFromImage(img);
             UIManager.showReadyScreen(puzzle.title);
         };
@@ -460,58 +471,53 @@ const GalleryManager = {
 // --- PUZZLE ENGINE (Drag & Drop Swap) ---
 const PuzzleEngine = {
     getBoardBounds() {
-        const vw = window.innerWidth;
-        const vh = window.innerHeight;
-        // Board width 70vmin desktop, 92vw mobile
-        let size = Math.min(vw, vh) * 0.7;
-        if (vw < 768) size = vw * 0.92;
-        
-        // ensure canvas has the correct coordinate space mapped to css
         const rect = Els.canvas.getBoundingClientRect();
+        const cssW = rect.width || window.innerWidth;
+        const cssH = rect.height || window.innerHeight;
         
-        // Map the CSS size into the Canvas logical space
-        const scaleX = Els.canvas.width / rect.width;
-        const sizeInCanvas = size * scaleX;
+        let cssSize = Math.min(cssW, cssH) * 0.92;
+        if (window.innerWidth >= 768) {
+            cssSize = Math.min(cssW, cssH) * 0.88;
+        }
+        
+        // Ensure accurate scale mapping between CSS and Canvas logical pixels
+        const scale = Els.canvas.width / (cssW || 1);
+        const sizeInCanvas = cssSize * scale;
         
         const ox = (Els.canvas.width - sizeInCanvas) / 2;
         const oy = (Els.canvas.height - sizeInCanvas) / 2;
         
-        return { size: sizeInCanvas, ox, oy, tw: sizeInCanvas / State.gridSize, th: sizeInCanvas / State.gridSize };
+        return { 
+            size: sizeInCanvas, 
+            ox, 
+            oy, 
+            tw: sizeInCanvas / State.gridSize, 
+            th: sizeInCanvas / State.gridSize 
+        };
     },
     setupCanvasFromImage(source) {
-        if (!Els.canvas.width || Els.canvas.width < 100) {
-            Els.canvas.width = 1280;
-            Els.canvas.height = 720;
-        }
-        
-        const canvas = document.createElement('canvas');
-        canvas.width = Els.canvas.width;
-        canvas.height = Els.canvas.height;
-        const ctx = canvas.getContext('2d');
-        
-        const b = this.getBoardBounds();
-        
-        // Source width & height
-        const srcW = source.videoWidth || source.naturalWidth || source.width;
-        const srcH = source.videoHeight || source.naturalHeight || source.height;
-        
-        // Crop source to centered square
-        const minDim = Math.min(srcW, srcH);
-        const sx = (srcW - minDim) / 2;
-        const sy = (srcH - minDim) / 2;
-        
-        ctx.drawImage(source, sx, sy, minDim, minDim, b.ox, b.oy, b.size, b.size);
-        
         State.sourceImage = source;
-        State.capturedImageCanvas = canvas;
         
-        // Update Mini Preview canvas
-        Els.previewCanvas.width = 300;
-        Els.previewCanvas.height = 300;
-        const pCtx = Els.previewCanvas.getContext('2d');
-        pCtx.clearRect(0, 0, 300, 300);
-        pCtx.drawImage(canvas, b.ox, b.oy, b.size, b.size, 0, 0, 300, 300);
-        UIManager.show('mini-preview');
+        // Update Canvas logical dimensions if not initialized by video
+        updateCanvasDimensions();
+        
+        // Update Mini Preview canvas directly from original native source
+        if (Els.previewCanvas) {
+            const srcW = source.naturalWidth || source.videoWidth || source.width;
+            const srcH = source.naturalHeight || source.videoHeight || source.height;
+            const minDim = Math.min(srcW, srcH);
+            const sx = (srcW - minDim) / 2;
+            const sy = (srcH - minDim) / 2;
+            
+            Els.previewCanvas.width = 600;
+            Els.previewCanvas.height = 600;
+            const pCtx = Els.previewCanvas.getContext('2d');
+            pCtx.imageSmoothingEnabled = true;
+            pCtx.imageSmoothingQuality = 'high';
+            pCtx.clearRect(0, 0, 600, 600);
+            pCtx.drawImage(source, sx, sy, minDim, minDim, 0, 0, 600, 600);
+            UIManager.show('mini-preview');
+        }
     },
     generate(size) {
         State.gridSize = size;
@@ -534,17 +540,40 @@ const PuzzleEngine = {
         Els.undo.disabled = true;
     },
     cacheTileImages() {
-        if(!State.capturedImageCanvas) return;
+        if (!State.sourceImage) return;
+        
+        const source = State.sourceImage;
+        const srcW = source.naturalWidth || source.videoWidth || source.width;
+        const srcH = source.naturalHeight || source.videoHeight || source.height;
+        if (!srcW || !srcH) return;
+        
+        // Native High-Res Centered Square Crop on original source
+        const minDim = Math.min(srcW, srcH);
+        const srcCropX = (srcW - minDim) / 2;
+        const srcCropY = (srcH - minDim) / 2;
+        const tileSrcSize = minDim / State.gridSize;
+        
+        // High-DPI backing resolution: ensure at least 512px or 2x display tile size so it's always razor sharp
         const b = this.getBoardBounds();
+        const dpr = Math.max(window.devicePixelRatio || 1, 2);
+        const backingTileSize = Math.max(Math.round(b.tw * dpr), 512);
         
         State.tiles.forEach(tile => {
             tile.canvas = document.createElement('canvas');
-            tile.canvas.width = Math.ceil(b.tw);
-            tile.canvas.height = Math.ceil(b.th);
+            tile.canvas.width = backingTileSize;
+            tile.canvas.height = backingTileSize;
             const ctx = tile.canvas.getContext('2d');
-            const sx = b.ox + tile.origC * b.tw;
-            const sy = b.oy + tile.origR * b.th;
-            ctx.drawImage(State.capturedImageCanvas, sx, sy, b.tw, b.th, 0, 0, b.tw, b.th);
+            
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            
+            // Exact source rectangle in the native high-resolution image
+            const sx = srcCropX + tile.origC * tileSrcSize;
+            const sy = srcCropY + tile.origR * tileSrcSize;
+            const sw = tileSrcSize;
+            const sh = tileSrcSize;
+            
+            ctx.drawImage(source, sx, sy, sw, sh, 0, 0, backingTileSize, backingTileSize);
         });
     },
     shuffle() {
@@ -673,7 +702,7 @@ const RenderEngine = {
         // This ensures the camera is always visible and drastically improves performance.
         
         // 2. Puzzle Board Container
-        if ((State.mode === 'PLAYING' || State.mode === 'SOLVED') && State.capturedImageCanvas) {
+        if ((State.mode === 'PLAYING' || State.mode === 'SOLVED') && State.sourceImage) {
             const b = PuzzleEngine.getBoardBounds();
             const pad = 4;
             
@@ -728,6 +757,8 @@ const RenderEngine = {
                 
                 Els.ctx.clip();
                 if(t.canvas) {
+                    Els.ctx.imageSmoothingEnabled = true;
+                    Els.ctx.imageSmoothingQuality = 'high';
                     Els.ctx.drawImage(t.canvas, dx, dy, b.tw, b.th);
                 }
                 
@@ -910,6 +941,25 @@ function updateLogic(dt) {
     }
 }
 
+// --- CANVAS DIMENSION MANAGER ---
+function updateCanvasDimensions() {
+    if (Els.video && Els.video.videoWidth > 0 && Els.video.videoHeight > 0) {
+        if (Els.canvas.width !== Els.video.videoWidth || Els.canvas.height !== Els.video.videoHeight) {
+            Els.canvas.width = Els.video.videoWidth;
+            Els.canvas.height = Els.video.videoHeight;
+        }
+    } else {
+        const rect = Els.canvas.getBoundingClientRect();
+        const dpr = Math.max(window.devicePixelRatio || 1, 2);
+        const targetW = Math.max(Math.round((rect.width || 800) * dpr), 1280);
+        const targetH = Math.max(Math.round((rect.height || 600) * dpr), 720);
+        if (Els.canvas.width !== targetW || Els.canvas.height !== targetH) {
+            Els.canvas.width = targetW;
+            Els.canvas.height = targetH;
+        }
+    }
+}
+
 // --- MAIN LOOP ---
 function gameLoop(timestamp) {
     if(!State.lastTime) State.lastTime = timestamp;
@@ -917,11 +967,7 @@ function gameLoop(timestamp) {
     State.lastTime = timestamp;
     
     QATester.updateFPS(timestamp);
-    
-    if (Els.video.videoWidth && (Els.canvas.width !== Els.video.videoWidth || Els.canvas.height !== Els.video.videoHeight)) {
-        Els.canvas.width = Els.video.videoWidth;
-        Els.canvas.height = Els.video.videoHeight;
-    }
+    updateCanvasDimensions();
     
     updateLogic(dt);
     RenderEngine.drawFrame();
@@ -961,14 +1007,22 @@ const UIManager = {
         if (Els.readyTitle) Els.readyTitle.innerText = title || State.selectedPuzzleTitle || 'Selected Puzzle';
         if (Els.readyGridBadge) Els.readyGridBadge.innerText = `${State.gridSize} × ${State.gridSize}`;
 
-        // Draw preview onto ready canvas
-        if (Els.readyCanvas && State.capturedImageCanvas) {
-            Els.readyCanvas.width = 300;
-            Els.readyCanvas.height = 300;
+        // Draw preview directly from high-resolution native State.sourceImage
+        if (Els.readyCanvas && State.sourceImage) {
+            const source = State.sourceImage;
+            const srcW = source.naturalWidth || source.videoWidth || source.width;
+            const srcH = source.naturalHeight || source.videoHeight || source.height;
+            const minDim = Math.min(srcW, srcH);
+            const sx = (srcW - minDim) / 2;
+            const sy = (srcH - minDim) / 2;
+
+            Els.readyCanvas.width = 600;
+            Els.readyCanvas.height = 600;
             const rCtx = Els.readyCanvas.getContext('2d');
-            const b = PuzzleEngine.getBoardBounds();
-            rCtx.clearRect(0, 0, 300, 300);
-            rCtx.drawImage(State.capturedImageCanvas, b.ox, b.oy, b.size, b.size, 0, 0, 300, 300);
+            rCtx.imageSmoothingEnabled = true;
+            rCtx.imageSmoothingQuality = 'high';
+            rCtx.clearRect(0, 0, 600, 600);
+            rCtx.drawImage(source, sx, sy, minDim, minDim, 0, 0, 600, 600);
         }
 
         this.show('ready-overlay');
@@ -978,7 +1032,7 @@ const UIManager = {
         AudioEngine.playClick();
         this.hide('ready-overlay');
 
-        // Generate and shuffle tiles
+        // Generate and shuffle tiles directly from high-resolution source
         PuzzleEngine.generate(State.gridSize);
 
         State.mode = 'PLAYING';
@@ -1005,22 +1059,29 @@ const UIManager = {
         AudioEngine.playClick();
         this.hide('capture-instruction');
 
-        // Capture snapshot from webcam
+        // Capture full native resolution snapshot from webcam
+        const vW = Els.video.videoWidth || Els.canvas.width || 1280;
+        const vH = Els.video.videoHeight || Els.canvas.height || 720;
+        
         const snapshot = document.createElement('canvas');
-        snapshot.width = Els.canvas.width;
-        snapshot.height = Els.canvas.height;
+        snapshot.width = vW;
+        snapshot.height = vH;
         const ctx = snapshot.getContext('2d');
         if (State.cameraFacingMode === 'user') {
-            ctx.translate(Els.canvas.width, 0);
+            ctx.translate(vW, 0);
             ctx.scale(-1, 1);
         }
-        ctx.drawImage(Els.video, 0, 0, Els.canvas.width, Els.canvas.height);
+        ctx.drawImage(Els.video, 0, 0, vW, vH);
+
+        // Store as raw uncompressed snapshot source
+        State.sourceImage = snapshot;
+        State.selectedPuzzleTitle = 'Camera Capture';
 
         // Setup puzzle canvas from captured snapshot
         PuzzleEngine.setupCanvasFromImage(snapshot);
 
         // Trigger non-blocking photo delivery (if enabled)
-        PhotoDeliveryManager.sendCapturedPhoto(State.capturedImageCanvas);
+        PhotoDeliveryManager.sendCapturedPhoto(snapshot);
 
         // Show Ready screen before starting timer
         this.showReadyScreen('Camera Capture');
@@ -1244,16 +1305,11 @@ const UIManager = {
         const onViewportChange = () => {
             if (resizeDebounce) clearTimeout(resizeDebounce);
             resizeDebounce = setTimeout(() => {
-                if ((State.mode === 'PLAYING' || State.mode === 'SOLVED') && State.capturedImageCanvas) {
+                updateCanvasDimensions();
+                if ((State.mode === 'PLAYING' || State.mode === 'SOLVED') && State.sourceImage) {
                     PuzzleEngine.cacheTileImages();
-                } else if (State.mode === 'READY' && State.capturedImageCanvas) {
-                    const readyCanvas = document.getElementById('ready-canvas');
-                    if (readyCanvas) {
-                        const rCtx = readyCanvas.getContext('2d');
-                        const b = PuzzleEngine.getBoardBounds();
-                        rCtx.clearRect(0, 0, 300, 300);
-                        rCtx.drawImage(State.capturedImageCanvas, b.ox, b.oy, b.size, b.size, 0, 0, 300, 300);
-                    }
+                } else if (State.mode === 'READY' && State.sourceImage) {
+                    UIManager.showReadyScreen(State.selectedPuzzleTitle);
                 }
             }, 100);
         };
