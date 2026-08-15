@@ -705,6 +705,7 @@ const PuzzleEngine = {
         }
     },
     generate(size) {
+        HintManager.invalidate();
         State.gridSize = size;
         State.tiles = [];
         for (let r=0; r<size; r++) {
@@ -762,6 +763,7 @@ const PuzzleEngine = {
         });
     },
     shuffle() {
+        HintManager.invalidate();
         let attempts = 0;
         do {
             for (let i = State.tiles.length - 1; i > 0; i--) {
@@ -793,6 +795,7 @@ const PuzzleEngine = {
         return {c, r};
     },
     swapTiles(tile1, targetCell) {
+        HintManager.invalidate();
         const tile2 = State.tiles.find(t => t.c === targetCell.c && t.r === targetCell.r && t !== tile1);
         
         State.history.push({
@@ -835,6 +838,7 @@ const PuzzleEngine = {
     },
     undo() {
         if(State.history.length === 0) return;
+        HintManager.invalidate();
         const last = State.history.pop();
         const tile1 = State.tiles.find(t => t.id === last.t1);
         const tile2 = last.t2 !== null ? State.tiles.find(t => t.id === last.t2) : null;
@@ -872,6 +876,7 @@ const PuzzleEngine = {
     checkWin() {
         if (State.mode !== 'PLAYING') return;
         if (this.isPuzzleSolved()) {
+            HintManager.dismiss();
             State.mode = 'SOLVED';
             clearInterval(State.timerInterval);
             
@@ -891,6 +896,368 @@ const PuzzleEngine = {
             }));
             QATester.assert(true, "Puzzle solved successfully");
         }
+    }
+};
+
+// --- SMART UNIVERSAL HINT SYSTEM ---
+const HintManager = {
+    active: false,
+    level: 0, // 0 = off, 1 = Visual Guidance, 2 = Action Guidance, 3 = Show The Move (Preview)
+    sourceTile: null,
+    targetCell: null,
+    targetTile: null,
+    isMutual: false,
+    previewAnim: null, // { startTime, duration }
+
+    invalidate() {
+        this.active = false;
+        this.level = 0;
+        this.sourceTile = null;
+        this.targetCell = null;
+        this.targetTile = null;
+        this.isMutual = false;
+        this.previewAnim = null;
+        this.updateButtonUI();
+    },
+
+    dismiss() {
+        this.invalidate();
+    },
+
+    updateButtonUI() {
+        if (!Els.hint) return;
+        Els.hint.classList.remove('active', 'active-level-2', 'active-level-3');
+        if (this.active) {
+            if (this.level === 1) Els.hint.classList.add('active');
+            else if (this.level === 2) Els.hint.classList.add('active-level-2');
+            else if (this.level === 3) Els.hint.classList.add('active-level-3');
+        }
+    },
+
+    solveNextMove() {
+        if (State.mode !== 'PLAYING' || !State.tiles || State.tiles.length === 0) return null;
+        if (PuzzleEngine.isPuzzleSolved()) return null;
+
+        const size = State.gridSize;
+        const total = size * size;
+        
+        // Build current board map: cellIndex -> tile
+        const board = new Array(total);
+        for (const tile of State.tiles) {
+            const currentIdx = tile.r * size + tile.c;
+            board[currentIdx] = tile;
+        }
+
+        // 1. Priority 1 — 2-Cycle Mutual Swaps (Swapping fixes 2 tiles at once)
+        for (let i = 0; i < total; i++) {
+            const tileA = board[i];
+            if (!tileA) continue;
+            const targetA = tileA.origR * size + tileA.origC;
+            if (targetA !== i) {
+                const tileB = board[targetA];
+                if (tileB) {
+                    const targetB = tileB.origR * size + tileB.origC;
+                    if (targetB === i) {
+                        return {
+                            sourceTile: tileA,
+                            targetCell: { c: tileA.origC, r: tileA.origR },
+                            targetTile: tileB,
+                            isMutual: true
+                        };
+                    }
+                }
+            }
+        }
+
+        // 2. Priority 2 — First misplaced cell in natural reading order
+        // Move the tile belonging at this home cell into it
+        for (let idx = 0; idx < total; idx++) {
+            const currentTile = board[idx];
+            if (!currentTile) continue;
+            const currentTileHome = currentTile.origR * size + currentTile.origC;
+            if (currentTileHome !== idx) {
+                // Find the tile that belongs at `idx`
+                const homeTile = State.tiles.find(t => t.origR * size + t.origC === idx);
+                if (homeTile && (homeTile.c !== homeTile.origC || homeTile.r !== homeTile.origR)) {
+                    return {
+                        sourceTile: homeTile,
+                        targetCell: { c: homeTile.origC, r: homeTile.origR },
+                        targetTile: currentTile,
+                        isMutual: false
+                    };
+                }
+
+                // Or move currentTile to its own home cell
+                const tileAtHome = board[currentTileHome] || null;
+                return {
+                    sourceTile: currentTile,
+                    targetCell: { c: currentTile.origC, r: currentTile.origR },
+                    targetTile: tileAtHome,
+                    isMutual: false
+                };
+            }
+        }
+
+        return null;
+    },
+
+    triggerHint() {
+        if (State.mode !== 'PLAYING') return;
+        if (PuzzleEngine.isPuzzleSolved()) {
+            this.dismiss();
+            return;
+        }
+
+        AudioEngine.playClick();
+
+        if (!this.active) {
+            // Level 1: Visual Guidance
+            const move = this.solveNextMove();
+            if (!move || !move.sourceTile || !move.targetCell) {
+                this.dismiss();
+                return;
+            }
+            this.active = true;
+            this.level = 1;
+            this.sourceTile = move.sourceTile;
+            this.targetCell = move.targetCell;
+            this.targetTile = move.targetTile;
+            this.isMutual = move.isMutual;
+            this.previewAnim = null;
+
+            // Small configurable hint penalty: +3 seconds to timer
+            if (State.startTime && State.gameStarted) {
+                State.startTime -= 3000;
+                State.elapsed = Math.floor((Date.now() - State.startTime) / 1000);
+                const m = Math.floor(State.elapsed / 60).toString().padStart(2, '0');
+                const s = (State.elapsed % 60).toString().padStart(2, '0');
+                Els.time.innerText = `${m}:${s}`;
+            }
+        } else if (this.level === 1) {
+            // Level 2: Action Guidance
+            this.level = 2;
+        } else if (this.level === 2) {
+            // Level 3: Show The Move (Preview Demonstration)
+            this.level = 3;
+            this.previewAnim = {
+                startTime: performance.now(),
+                duration: 1600 // 1.6s demonstration
+            };
+        } else {
+            // Toggle off
+            this.dismiss();
+            return;
+        }
+
+        this.updateButtonUI();
+    },
+
+    render(ctx, b, timestamp) {
+        if (!this.active || State.mode !== 'PLAYING' || !this.sourceTile || !this.targetCell) {
+            return;
+        }
+
+        // Validate that source tile and target are still consistent with current board
+        const curSourceCell = { c: this.sourceTile.c, r: this.sourceTile.r };
+        if (curSourceCell.c === this.targetCell.c && curSourceCell.r === this.targetCell.r) {
+            // Tile was already moved to target! Invalidate
+            this.invalidate();
+            return;
+        }
+
+        const t = (timestamp || performance.now()) * 0.001;
+        const pulse = Math.sin(t * 5) * 0.5 + 0.5; // 0..1
+        const pad = 4;
+
+        // Source Cell coordinates
+        const srcX = b.ox + this.sourceTile.c * b.tw;
+        const srcY = b.oy + this.sourceTile.r * b.th;
+        const srcCenterX = srcX + b.tw / 2;
+        const srcCenterY = srcY + b.th / 2;
+
+        // Target Cell coordinates
+        const tgtX = b.ox + this.targetCell.c * b.tw;
+        const tgtY = b.oy + this.targetCell.r * b.th;
+        const tgtCenterX = tgtX + b.tw / 2;
+        const tgtCenterY = tgtY + b.th / 2;
+
+        // --- LEVEL 3 DEMO ANIMATION PROGRESSION ---
+        if (this.level === 3 && this.previewAnim) {
+            const elapsed = performance.now() - this.previewAnim.startTime;
+            const p = Math.min(1, elapsed / this.previewAnim.duration);
+            if (p >= 1) {
+                // Animation finished: return to Level 2
+                this.previewAnim = null;
+                this.level = 2;
+                this.updateButtonUI();
+            } else {
+                // Smooth sine bell curve: 0 -> 1 -> 0
+                const demoFactor = Math.sin(p * Math.PI);
+                const demoDx = (tgtX - srcX) * demoFactor;
+                const demoDy = (tgtY - srcY) * demoFactor;
+
+                // Draw floating ghost preview of the swap
+                ctx.save();
+                ctx.globalAlpha = 0.85;
+                if (this.sourceTile.canvas) {
+                    RenderEngine.roundRect(ctx, srcX + demoDx + pad, srcY + demoDy + pad, b.tw - pad * 2, b.th - pad * 2, 16);
+                    ctx.clip();
+                    ctx.drawImage(this.sourceTile.canvas, srcX + demoDx, srcY + demoDy, b.tw, b.th);
+                }
+                ctx.restore();
+            }
+        }
+
+        ctx.save();
+
+        // 1. Source Tile Highlight (Amber)
+        const srcStrokeAlpha = 0.65 + pulse * 0.35;
+        RenderEngine.roundRect(ctx, srcX + pad, srcY + pad, b.tw - pad * 2, b.th - pad * 2, 16);
+        ctx.strokeStyle = `rgba(245, 184, 75, ${srcStrokeAlpha})`;
+        ctx.lineWidth = this.level >= 2 ? 3.0 : 2.2;
+        ctx.shadowColor = 'rgba(245, 184, 75, 0.6)';
+        ctx.shadowBlur = 8 + pulse * 6;
+        ctx.stroke();
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+
+        ctx.fillStyle = 'rgba(245, 184, 75, 0.12)';
+        ctx.fill();
+
+        // 2. Target Cell Highlight (Mint / Cyan)
+        const tgtStrokeAlpha = 0.65 + pulse * 0.35;
+        RenderEngine.roundRect(ctx, tgtX + pad, tgtY + pad, b.tw - pad * 2, b.th - pad * 2, 16);
+        ctx.strokeStyle = `rgba(99, 230, 190, ${tgtStrokeAlpha})`;
+        ctx.lineWidth = this.level >= 2 ? 3.0 : 2.2;
+        ctx.shadowColor = 'rgba(99, 230, 190, 0.6)';
+        ctx.shadowBlur = 8 + pulse * 6;
+        ctx.stroke();
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+
+        ctx.fillStyle = 'rgba(99, 230, 190, 0.14)';
+        ctx.fill();
+
+        // Corner Brackets for Target Cell
+        const bLen = Math.min(14, b.tw * 0.22);
+        ctx.strokeStyle = '#63E6BE';
+        ctx.lineWidth = 2.0;
+        ctx.lineCap = 'round';
+
+        // TL
+        ctx.beginPath();
+        ctx.moveTo(tgtX + pad, tgtY + pad + bLen);
+        ctx.lineTo(tgtX + pad, tgtY + pad);
+        ctx.lineTo(tgtX + pad + bLen, tgtY + pad);
+        ctx.stroke();
+        // TR
+        ctx.beginPath();
+        ctx.moveTo(tgtX + b.tw - pad - bLen, tgtY + pad);
+        ctx.lineTo(tgtX + b.tw - pad, tgtY + pad);
+        ctx.lineTo(tgtX + b.tw - pad, tgtY + pad + bLen);
+        ctx.stroke();
+        // BL
+        ctx.beginPath();
+        ctx.moveTo(tgtX + pad, tgtY + b.th - pad - bLen);
+        ctx.lineTo(tgtX + pad, tgtY + b.th - pad);
+        ctx.lineTo(tgtX + pad + bLen, tgtY + b.th - pad);
+        ctx.stroke();
+        // BR
+        ctx.beginPath();
+        ctx.moveTo(tgtX + b.tw - pad - bLen, tgtY + b.th - pad);
+        ctx.lineTo(tgtX + b.tw - pad, tgtY + b.th - pad);
+        ctx.lineTo(tgtX + b.tw - pad, tgtY + b.th - pad - bLen);
+        ctx.stroke();
+
+        // 3. Directional Connecting Arched Line with Animated Flow & Arrow
+        const dx = tgtCenterX - srcCenterX;
+        const dy = tgtCenterY - srcCenterY;
+        const dist = Math.hypot(dx, dy);
+
+        if (dist > 10) {
+            // Arc curvature perpendicular to vector
+            const midX = (srcCenterX + tgtCenterX) / 2;
+            const midY = (srcCenterY + tgtCenterY) / 2;
+            const normalX = -dy / dist;
+            const normalY = dx / dist;
+            const arcOffset = Math.min(35, dist * 0.18);
+            const ctrlX = midX + normalX * arcOffset;
+            const ctrlY = midY + normalY * arcOffset;
+
+            // Gradient curve from Amber (source) to Mint (target)
+            const grad = ctx.createLinearGradient(srcCenterX, srcCenterY, tgtCenterX, tgtCenterY);
+            grad.addColorStop(0, 'rgba(245, 184, 75, 0.9)');
+            grad.addColorStop(1, 'rgba(99, 230, 190, 0.95)');
+
+            ctx.beginPath();
+            ctx.moveTo(srcCenterX, srcCenterY);
+            ctx.quadraticCurveTo(ctrlX, ctrlY, tgtCenterX, tgtCenterY);
+            ctx.strokeStyle = grad;
+            ctx.lineWidth = this.level >= 2 ? 3.0 : 2.2;
+            ctx.setLineDash([8, 6]);
+            ctx.lineDashOffset = -t * 30; // Animated moving dashes
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Draw directional arrowhead at target
+            const angle = Math.atan2(tgtCenterY - ctrlY, tgtCenterX - ctrlX);
+            const arrowSize = this.level >= 2 ? 14 : 10;
+
+            ctx.save();
+            ctx.translate(tgtCenterX, tgtCenterY);
+            ctx.rotate(angle);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(-arrowSize, -arrowSize * 0.55);
+            ctx.lineTo(-arrowSize * 0.65, 0);
+            ctx.lineTo(-arrowSize, arrowSize * 0.55);
+            ctx.closePath();
+            ctx.fillStyle = '#63E6BE';
+            ctx.shadowColor = '#63E6BE';
+            ctx.shadowBlur = 8;
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // 4. Compact Smart Badges / Labels
+        const labelSize = Math.max(9, Math.min(11, b.tw * 0.12));
+        ctx.font = `700 ${labelSize}px Inter, -apple-system, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        // Source Label
+        const srcText = (this.level >= 2) ? (this.isMutual ? "SWAP" : "MOVE") : "MOVE THIS";
+        const srcTagW = ctx.measureText(srcText).width + 14;
+        const srcTagH = labelSize + 8;
+        const srcTagY = srcY + pad + srcTagH / 2 + 4;
+
+        RenderEngine.roundRect(ctx, srcCenterX - srcTagW / 2, srcTagY - srcTagH / 2, srcTagW, srcTagH, 4);
+        ctx.fillStyle = 'rgba(16, 20, 22, 0.92)';
+        ctx.fill();
+        ctx.strokeStyle = '#F5B84B';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+
+        ctx.fillStyle = '#F5B84B';
+        ctx.fillText(srcText, srcCenterX, srcTagY);
+
+        // Target Label
+        const tgtText = (this.level >= 2) ? (this.isMutual ? "SWAP HERE" : "HERE") : "TARGET";
+        const tgtTagW = ctx.measureText(tgtText).width + 14;
+        const tgtTagH = labelSize + 8;
+        const tgtTagY = tgtY + b.th - pad - tgtTagH / 2 - 4;
+
+        RenderEngine.roundRect(ctx, tgtCenterX - tgtTagW / 2, tgtTagY - tgtTagH / 2, tgtTagW, tgtTagH, 4);
+        ctx.fillStyle = 'rgba(16, 20, 22, 0.92)';
+        ctx.fill();
+        ctx.strokeStyle = '#63E6BE';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+
+        ctx.fillStyle = '#63E6BE';
+        ctx.fillText(tgtText, tgtCenterX, tgtTagY);
+
+        ctx.restore();
     }
 };
 
@@ -1114,11 +1481,14 @@ const RenderEngine = {
                     Els.ctx.drawImage(t.canvas, dx, dy, b.tw, b.th);
                 }
                 
-                Els.ctx.strokeStyle = (State.hintsEnabled && t.c === t.origC && t.r === t.origR) ? 'rgba(99, 230, 190, 0.8)' : (isSelected ? 'rgba(99, 230, 190, 0.5)' : 'rgba(255, 255, 255, 0.12)');
-                Els.ctx.lineWidth = isSelected ? 2 : 1.2;
+                Els.ctx.strokeStyle = isSelected ? 'rgba(99, 230, 190, 0.65)' : 'rgba(255, 255, 255, 0.12)';
+                Els.ctx.lineWidth = isSelected ? 2.2 : 1.2;
                 Els.ctx.stroke();
                 Els.ctx.restore();
             });
+
+            // Draw Smart Universal Hint Overlay (Visual Guidance, Action Guidance, & Move Demo)
+            HintManager.render(Els.ctx, b, timestamp);
         }
         
         // 3. Hands & Interaction (High-Visibility Futuristic Interface Overlay)
@@ -1752,6 +2122,7 @@ const UIManager = {
         }
 
         const resetToCapture = () => {
+            HintManager.invalidate();
             AudioEngine.playClick();
             this.hide('win-modal');
             this.hide('mini-preview');
@@ -1775,7 +2146,7 @@ const UIManager = {
         };
         
         Els.undo.addEventListener('click', () => PuzzleEngine.undo());
-        Els.hint.addEventListener('click', () => { AudioEngine.playClick(); State.hintsEnabled = !State.hintsEnabled; });
+        Els.hint.addEventListener('click', () => { HintManager.triggerHint(); });
         Els.sound.addEventListener('click', () => { 
             State.soundEnabled = !State.soundEnabled; 
             Els.sound.setAttribute('data-muted', State.soundEnabled ? '0' : '1');
@@ -1809,6 +2180,7 @@ const UIManager = {
         if (winNewCapBtn) winNewCapBtn.addEventListener('click', resetToCapture);
         
         const restartGame = () => {
+            HintManager.invalidate();
             AudioEngine.playClick();
             this.hide('win-modal');
             if (State.mode === 'PLAYING' || State.mode === 'SOLVED') {
@@ -1830,6 +2202,7 @@ const UIManager = {
         document.getElementById('play-again-btn').addEventListener('click', restartGame);
         
         Els.difficulty.addEventListener('change', () => {
+            HintManager.invalidate();
             AudioEngine.playClick();
             State.gridSize = parseInt(Els.difficulty.value) || 3;
             StorageManager.updateBestDisplay();
@@ -1914,7 +2287,7 @@ const UIManager = {
         
         document.addEventListener('keydown', e => {
             if(e.key === 'z' || e.key === 'Z') { PuzzleEngine.undo(); return; }
-            if(e.key === 'h' || e.key === 'H') { State.hintsEnabled = !State.hintsEnabled; return; }
+            if(e.key === 'h' || e.key === 'H') { HintManager.triggerHint(); return; }
         });
     }
 };

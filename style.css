@@ -319,6 +319,28 @@ video#input-video {
     box-shadow: 0 0 12px rgba(99, 230, 190, 0.08);
 }
 
+/* Hint Button Active Glowing Levels */
+#hint-btn.active {
+    background: rgba(245, 184, 75, 0.16) !important;
+    border-color: rgba(245, 184, 75, 0.6) !important;
+    color: var(--amber) !important;
+    box-shadow: 0 0 12px rgba(245, 184, 75, 0.35) !important;
+}
+
+#hint-btn.active-level-2 {
+    background: rgba(99, 230, 190, 0.18) !important;
+    border-color: rgba(99, 230, 190, 0.65) !important;
+    color: var(--accent) !important;
+    box-shadow: 0 0 14px rgba(99, 230, 190, 0.45) !important;
+}
+
+#hint-btn.active-level-3 {
+    background: rgba(99, 230, 190, 0.28) !important;
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+    box-shadow: 0 0 18px rgba(99, 230, 190, 0.6) !important;
+}
+
 /* Secondary */
 .btn-secondary {
     background: var(--surface-2);
