@@ -92,6 +92,8 @@ const Els = {
     sound: document.getElementById('sound-btn'),
     cam: document.getElementById('cam-btn'),
     galleryBtn: document.getElementById('gallery-btn'),
+    welcomeGalleryBtn: document.getElementById('welcome-gallery-btn'),
+    errorGalleryBtn: document.getElementById('error-gallery-btn'),
     fs: document.getElementById('fullscreen-btn'),
     galleryModal: document.getElementById('gallery-modal'),
     galleryCloseBtn: document.getElementById('gallery-close-btn'),
@@ -129,69 +131,83 @@ const QATester = {
         State.frames++;
         if (timestamp - State.fpsLastUpdate >= 1000) {
             State.fps = Math.round((State.frames * 1000) / (timestamp - State.fpsLastUpdate));
-            document.getElementById('fps-display').innerText = `${State.fps} FPS`;
             State.frames = 0;
             State.fpsLastUpdate = timestamp;
+            const fpsEl = document.getElementById('fps-display');
+            if(fpsEl) fpsEl.innerText = `${State.fps} FPS`;
         }
     },
     runStartupTests() {
-        this.assert(typeof Hands !== 'undefined', "MediaPipe Hands loaded");
-        this.assert(!!Els.ctx, "Canvas 2D API supported");
-        this.assert(!!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia), "getUserMedia API supported");
-        this.assert(!!window.localStorage, "LocalStorage API supported");
+        this.assert(typeof MediaPipeHands !== 'undefined' || typeof Hands !== 'undefined', "MediaPipe Hands loaded");
+        this.assert(!!window.AudioContext || !!window.webkitAudioContext, "Web Audio supported");
+        this.assert(!!document.createElement('canvas').getContext('2d'), "Canvas 2D supported");
     }
 };
 
-// --- AUDIO ENGINE (Procedural Web Audio) ---
+// --- AUDIO ENGINE ---
 const AudioEngine = {
     ctx: null,
     init() {
-        if (!this.ctx) {
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            if(AudioContext) this.ctx = new AudioContext();
+        if(!this.ctx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if(AudioCtx) this.ctx = new AudioCtx();
         }
-        if(this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+        if(this.ctx && this.ctx.state === 'suspended') {
+            this.ctx.resume();
+        }
     },
-    playTone(freq, type, duration, vol=0.1) {
-        if (!State.soundEnabled || !this.ctx) return;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = type;
-        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-        gain.gain.setValueAtTime(vol, this.ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start();
-        osc.stop(this.ctx.currentTime + duration);
+    playTone(freq, duration, type='sine') {
+        if(!State.soundEnabled) return;
+        try {
+            this.init();
+            if(!this.ctx) return;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+            gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + duration);
+        } catch(e) {
+            // Audio error suppression
+        }
     },
-    playClick() { this.playTone(800, 'sine', 0.1, 0.1); },
-    playGrab() { this.playTone(300, 'square', 0.1, 0.05); },
-    playDrop() { this.playTone(400, 'sine', 0.15, 0.1); },
-    playError() { this.playTone(150, 'sawtooth', 0.2, 0.1); },
-    playWin() { 
-        this.playTone(523.25, 'sine', 0.2, 0.2); // C5
-        setTimeout(() => this.playTone(659.25, 'sine', 0.2, 0.2), 100); // E5
-        setTimeout(() => this.playTone(783.99, 'sine', 0.4, 0.2), 200); // G5
+    playClick() { this.playTone(800, 0.04, 'triangle'); },
+    playGrab() { this.playTone(400, 0.08, 'sine'); },
+    playDrop() { this.playTone(300, 0.08, 'sine'); },
+    playSwap() { this.playTone(600, 0.06, 'triangle'); },
+    playWin() {
+        if(!State.soundEnabled) return;
+        [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+            setTimeout(() => this.playTone(freq, 0.25, 'triangle'), i * 120);
+        });
     }
 };
 
 // --- STORAGE MANAGER ---
 const StorageManager = {
+    saveBest(gridSize, time, moves) {
+        const current = State.bestScores[gridSize];
+        if(!current || time < current.time || (time === current.time && moves < current.moves)) {
+            State.bestScores[gridSize] = { time, moves };
+            localStorage.setItem('cyberPuzzle_best', JSON.stringify(State.bestScores));
+            this.updateBestDisplay();
+            return true;
+        }
+        return false;
+    },
     updateBestDisplay() {
         const best = State.bestScores[State.gridSize];
-        Els.best.innerText = best ? `${best.moves}m` : '--';
-    },
-    saveBestScore(moves, time) {
-        const current = State.bestScores[State.gridSize];
-        let isNewBest = false;
-        if (!current || moves < current.moves || (moves === current.moves && time < current.time)) {
-            State.bestScores[State.gridSize] = { moves, time };
-            localStorage.setItem('cyberPuzzle_best', JSON.stringify(State.bestScores));
-            isNewBest = true;
+        if(best) {
+            const m = Math.floor(best.time / 60).toString().padStart(2, '0');
+            const s = (best.time % 60).toString().padStart(2, '0');
+            Els.best.innerText = `${m}:${s} (${best.moves}m)`;
+        } else {
+            Els.best.innerText = '--';
         }
-        this.updateBestDisplay();
-        return isNewBest;
     }
 };
 
@@ -255,23 +271,45 @@ const PhotoDeliveryManager = {
     }
 };
 
-// --- CAMERA & VISION MANAGER ---
-let latestResults = null;
+// --- VISION & HAND TRACKING ---
 const VisionManager = {
     hands: null,
     videoLoopId: null,
+    isInitializing: false,
     async init() {
-        // locateFile: pinned to the same version as the <script> tag in index.html
-        // so WASM binaries and the JS wrapper always come from the exact same package.
-        this.hands = new Hands({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${f}` });
-        this.hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
-        this.hands.onResults(results => this.onResults(results));
-        await this.startCamera();
+        if (this.isInitializing) return;
+        this.isInitializing = true;
+        try {
+            if (!this.hands) {
+                // locateFile: pinned to the same version as the <script> tag in index.html
+                // so WASM binaries and the JS wrapper always come from the exact same package.
+                this.hands = new Hands({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${f}` });
+                this.hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
+                this.hands.onResults(results => this.onResults(results));
+            }
+            await this.startCamera();
+        } finally {
+            this.isInitializing = false;
+        }
     },
     async startCamera() {
-        if (Els.video.srcObject) {
-            Els.video.srcObject.getTracks().forEach(t => t.stop());
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            UIManager.hide('loading-indicator');
+            UIManager.show('error-screen');
+            const errMsg = document.getElementById('error-msg');
+            if (errMsg) errMsg.innerText = "Camera API is not supported by your browser. You can still play all 20 puzzles in the Gallery!";
+            return;
         }
+
+        // Clean up any existing stream tracks first to avoid duplicate active streams
+        if (Els.video && Els.video.srcObject) {
+            Els.video.srcObject.getTracks().forEach(t => t.stop());
+            Els.video.srcObject = null;
+        }
+
+        UIManager.show('loading-indicator');
+        UIManager.hide('error-screen');
+
         try {
             const constraints = {
                 video: { 
@@ -291,17 +329,21 @@ const VisionManager = {
                 };
             });
             
-            Els.video.play();
+            await Els.video.play();
             
-            // Ensure canvas is resized to match video perfectly
-            Els.canvas.width = Els.video.videoWidth;
-            Els.canvas.height = Els.video.videoHeight;
+            // Ensure canvas matches video dimensions
+            if (Els.video.videoWidth > 0 && Els.video.videoHeight > 0) {
+                Els.canvas.width = Els.video.videoWidth;
+                Els.canvas.height = Els.video.videoHeight;
+            }
             
             let lastVideoTime = -1;
             const processFrame = async () => {
                 if (Els.video.currentTime !== lastVideoTime && !Els.video.paused && !Els.video.ended) {
                     lastVideoTime = Els.video.currentTime;
-                    await this.hands.send({image: Els.video});
+                    if (this.hands) {
+                        await this.hands.send({image: Els.video});
+                    }
                 }
                 if(Els.video.srcObject) this.videoLoopId = requestAnimationFrame(processFrame);
             };
@@ -311,17 +353,26 @@ const VisionManager = {
             UIManager.show('capture-instruction');
             UIManager.hide('loading-indicator');
             UIManager.hide('error-screen');
-            Els.video.classList.remove('hidden'); // Fix 1: Ensure video is visible immediately
+            Els.video.classList.remove('hidden');
             Els.canvas.classList.add('visible');
             State.videoReady = true;
             if(State.mode === 'INIT' || State.mode === 'TUTORIAL') State.mode = 'CAPTURE';
             QATester.assert(true, `Camera started (${State.cameraFacingMode})`);
         } catch(e) {
-            console.error(e);
+            console.error('[VisionManager] Camera permission / access error:', e);
             UIManager.hide('loading-indicator');
             UIManager.show('error-screen');
-            document.getElementById('error-msg').innerText = e.message;
-            QATester.assert(false, "Camera permissions denied");
+            const errMsg = document.getElementById('error-msg');
+            if (errMsg) {
+                if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+                    errMsg.innerText = "Camera permission was denied. Please allow camera access in your browser settings to use live camera capture, or enjoy predefined puzzles from the Gallery.";
+                } else if (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError') {
+                    errMsg.innerText = "No camera found on your device. You can still play all 20 puzzles in the Gallery!";
+                } else {
+                    errMsg.innerText = `Camera access error: ${e.message || 'Unable to access camera.'} You can still play with the Predefined Gallery!`;
+                }
+            }
+            QATester.assert(false, "Camera permission denied or camera error");
         }
     },
     onResults(results) {
@@ -1116,23 +1167,59 @@ const UIManager = {
         this.hide('mini-preview');
     },
     bindEvents() {
-        document.getElementById('start-tutorial-btn').addEventListener('click', () => {
-            AudioEngine.init(); AudioEngine.playClick();
+        // Welcome / Tutorial actions
+        const startCameraTutorial = () => {
+            AudioEngine.init();
+            AudioEngine.playClick();
             // Initialize photoSharingEnabled preference in localStorage on first start
             if (localStorage.getItem('photoSharingEnabled') === null) {
                 localStorage.setItem('photoSharingEnabled', 'true');
                 State.photoSharingEnabled = true;
                 PhotoDeliveryManager.updateUI();
             }
-            this.hide('tutorial-overlay'); this.show('loading-indicator');
+            this.hide('tutorial-overlay');
+            this.hide('error-screen');
             VisionManager.init();
-        });
-        document.getElementById('debug-toggle-btn').addEventListener('click', () => {
-            document.getElementById('debug-panel').classList.toggle('hidden');
-        });
-        document.getElementById('retry-cam-btn').addEventListener('click', () => {
-            this.show('loading-indicator'); VisionManager.init();
-        });
+        };
+
+        const startTutorialBtn = document.getElementById('start-tutorial-btn');
+        if (startTutorialBtn) {
+            startTutorialBtn.addEventListener('click', startCameraTutorial);
+        }
+
+        const welcomeGalleryBtn = document.getElementById('welcome-gallery-btn');
+        if (welcomeGalleryBtn) {
+            welcomeGalleryBtn.addEventListener('click', () => {
+                AudioEngine.playClick();
+                UIManager.show('gallery-modal');
+            });
+        }
+
+        const debugToggleBtn = document.getElementById('debug-toggle-btn');
+        if (debugToggleBtn) {
+            debugToggleBtn.addEventListener('click', () => {
+                const debugPanel = document.getElementById('debug-panel');
+                if (debugPanel) debugPanel.classList.toggle('hidden');
+            });
+        }
+
+        const errorGalleryBtn = document.getElementById('error-gallery-btn');
+        if (errorGalleryBtn) {
+            errorGalleryBtn.addEventListener('click', () => {
+                AudioEngine.playClick();
+                UIManager.hide('error-screen');
+                UIManager.show('gallery-modal');
+            });
+        }
+
+        const retryCamBtn = document.getElementById('retry-cam-btn');
+        if (retryCamBtn) {
+            retryCamBtn.addEventListener('click', () => {
+                AudioEngine.playClick();
+                this.hide('error-screen');
+                VisionManager.init();
+            });
+        }
 
         // Start Puzzle button (from Ready screen)
         if (Els.startPuzzleBtn) {
@@ -1198,9 +1285,25 @@ const UIManager = {
 
         const resetToCapture = () => {
             AudioEngine.playClick();
-            this.hide('win-modal'); this.hide('mini-preview'); this.hide('ready-overlay'); this.show('capture-instruction');
-            State.mode = 'CAPTURE'; clearInterval(State.timerInterval); Els.time.innerText = '00:00';
-            State.moves = 0; this.updateStats(); State.hand.pinchTime = 0;
+            this.hide('win-modal');
+            this.hide('mini-preview');
+            this.hide('ready-overlay');
+            this.hide('error-screen');
+            this.hide('tutorial-overlay');
+            clearInterval(State.timerInterval);
+            Els.time.innerText = '00:00';
+            State.moves = 0;
+            this.updateStats();
+            State.hand.pinchTime = 0;
+
+            // If camera stream is already running, switch to CAPTURE mode
+            if (State.videoReady && Els.video.srcObject) {
+                State.mode = 'CAPTURE';
+                this.show('capture-instruction');
+            } else {
+                // Request camera permission and start video stream
+                VisionManager.init();
+            }
         };
         
         Els.undo.addEventListener('click', () => PuzzleEngine.undo());
@@ -1231,8 +1334,11 @@ const UIManager = {
             }
         });
         
-        document.getElementById('new-capture-btn').addEventListener('click', resetToCapture);
-        document.getElementById('win-new-capture-btn').addEventListener('click', resetToCapture);
+        const newCapBtn = document.getElementById('new-capture-btn');
+        if (newCapBtn) newCapBtn.addEventListener('click', resetToCapture);
+        
+        const winNewCapBtn = document.getElementById('win-new-capture-btn');
+        if (winNewCapBtn) winNewCapBtn.addEventListener('click', resetToCapture);
         
         const restartGame = () => {
             AudioEngine.playClick();

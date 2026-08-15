@@ -354,6 +354,53 @@ video#input-video {
     stroke: currentColor;
 }
 
+/* Gallery CTA Button — Distinct Soft Mint Highlight (#63E6BE) */
+.btn-gallery-cta {
+    background: rgba(99, 230, 190, 0.08);
+    border: 1px solid rgba(99, 230, 190, 0.38);
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 12.5px;
+    letter-spacing: 0.02em;
+    padding: 0 12px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border-radius: var(--r-sm);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), 0 0 10px rgba(99, 230, 190, 0.1);
+    transition: all 0.18s var(--ease-out);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.btn-gallery-cta:hover:not(:disabled) {
+    background: rgba(99, 230, 190, 0.18);
+    border-color: var(--accent);
+    color: #FFFFFF;
+    box-shadow: 0 4px 18px rgba(99, 230, 190, 0.3);
+    transform: translateY(-1px);
+}
+
+.btn-gallery-cta:active:not(:disabled) {
+    transform: scale(0.97);
+}
+
+.btn-gallery-cta:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.btn-gallery-cta svg {
+    stroke: var(--accent);
+    transition: stroke 0.15s ease;
+    flex-shrink: 0;
+}
+
+.btn-gallery-cta:hover svg {
+    stroke: #FFFFFF;
+}
+
 .btn-sm {
     font-size: 12px;
     height: 30px;
@@ -1590,9 +1637,27 @@ canvas#output-canvas.visible {
         flex-shrink: 0;
     }
 
-    .btn-icon svg, .btn-ghost svg {
-        width: 14px;
-        height: 14px;
+    .btn-gallery-cta {
+        height: 30px;
+        padding: 0 8px;
+        font-size: 11px;
+        gap: 5px;
+    }
+
+    @media (max-width: 380px) {
+        .gallery-btn-text {
+            display: none;
+        }
+        .btn-gallery-cta {
+            width: 30px;
+            padding: 0;
+            justify-content: center;
+        }
+    }
+
+    .btn-icon svg, .btn-ghost svg, .btn-gallery-cta svg {
+        width: 13px;
+        height: 13px;
     }
 
     .select-ctrl {
