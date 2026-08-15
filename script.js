@@ -517,7 +517,7 @@ const PuzzleEngine = {
             State.confetti = Array.from({length: 120}, () => ({
                 x: Els.canvas.width / 2, y: Els.canvas.height,
                 vx: (Math.random() - 0.5) * 800, vy: (Math.random() - 1) * 800 - 200,
-                color: ['#FFFFFF', '#7DD3FC', '#E2E8F0', '#94A3B8'][Math.floor(Math.random() * 4)],
+                color: ['#F3F5F4', '#63E6BE', '#F5B84B', '#9AA3A1', '#4FD1C5'][Math.floor(Math.random() * 5)],
                 size: Math.random() * 8 + 4, rot: Math.random() * Math.PI * 2, rotSpeed: (Math.random() - 0.5) * 10
             }));
             QATester.assert(true, "Puzzle solved successfully");
@@ -555,23 +555,23 @@ const RenderEngine = {
             // Draw glass background behind the board
             Els.ctx.save();
             this.roundRect(Els.ctx, b.ox - 10, b.oy - 10, b.size + 20, b.size + 20, 24);
-            Els.ctx.fillStyle = 'rgba(11, 13, 16, 0.4)';
+            Els.ctx.fillStyle = 'rgba(16, 19, 21, 0.65)';
             Els.ctx.fill();
-            Els.ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            Els.ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
             Els.ctx.lineWidth = 1;
             Els.ctx.stroke();
             Els.ctx.restore();
             
-            // Draw Target Highlight if dragging
+            // Draw Target Highlight if dragging (Soft Mint)
             if (State.isPinching && State.selectedTile && State.hand.exists) {
                 const targetCell = PuzzleEngine.getCellAt(State.hand.cx, State.hand.cy);
                 if (targetCell) {
                     Els.ctx.save();
                     this.roundRect(Els.ctx, b.ox + targetCell.c * b.tw + pad, b.oy + targetCell.r * b.th + pad, b.tw - pad*2, b.th - pad*2, 16);
-                    Els.ctx.fillStyle = 'rgba(125, 211, 252, 0.2)';
+                    Els.ctx.fillStyle = 'rgba(99, 230, 190, 0.12)';
                     Els.ctx.fill();
-                    Els.ctx.strokeStyle = '#7DD3FC';
-                    Els.ctx.lineWidth = 2;
+                    Els.ctx.strokeStyle = 'rgba(99, 230, 190, 0.65)';
+                    Els.ctx.lineWidth = 1.8;
                     Els.ctx.stroke();
                     Els.ctx.restore();
                 }
@@ -585,19 +585,19 @@ const RenderEngine = {
                 const isSelected = t === State.selectedTile;
                 
                 Els.ctx.save();
-                Els.ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+                Els.ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
                 Els.ctx.shadowBlur = isSelected ? 32 : 12;
                 Els.ctx.shadowOffsetY = isSelected ? 16 : 4;
                 
                 // Lift effect scale
                 if (isSelected) {
                     Els.ctx.translate(dx + b.tw/2, dy + b.th/2);
-                    Els.ctx.scale(1.05, 1.05);
+                    Els.ctx.scale(1.04, 1.04);
                     Els.ctx.translate(-(dx + b.tw/2), -(dy + b.th/2));
                 }
                 
                 this.roundRect(Els.ctx, dx + pad, dy + pad, b.tw - pad*2, b.th - pad*2, 16);
-                Els.ctx.fillStyle = '#0B0D10'; 
+                Els.ctx.fillStyle = '#15191B'; 
                 Els.ctx.fill();
                 Els.ctx.shadowColor = 'transparent';
                 
@@ -606,13 +606,14 @@ const RenderEngine = {
                     Els.ctx.drawImage(t.canvas, dx, dy, b.tw, b.th);
                 }
                 
-                Els.ctx.strokeStyle = (State.hintsEnabled && t.c === t.origC && t.r === t.origR) ? 'rgba(125, 211, 252, 0.6)' : 'rgba(255, 255, 255, 0.15)';
-                Els.ctx.lineWidth = 1.5; Els.ctx.stroke();
+                Els.ctx.strokeStyle = (State.hintsEnabled && t.c === t.origC && t.r === t.origR) ? 'rgba(99, 230, 190, 0.8)' : (isSelected ? 'rgba(99, 230, 190, 0.5)' : 'rgba(255, 255, 255, 0.12)');
+                Els.ctx.lineWidth = isSelected ? 2 : 1.2;
+                Els.ctx.stroke();
                 Els.ctx.restore();
             });
         }
         
-        // 3. Hands & Interaction
+        // 3. Hands & Interaction (Soft Mint Technical Overlay)
         if (latestResults && latestResults.multiHandLandmarks) {
             Els.ctx.save();
             if (State.cameraFacingMode === 'user') {
@@ -621,15 +622,15 @@ const RenderEngine = {
             }
             for (const lm of latestResults.multiHandLandmarks) {
                 if (typeof drawConnectors !== 'undefined') {
-                    drawConnectors(Els.ctx, lm, HAND_CONNECTIONS, {color: 'rgba(255, 255, 255, 0.2)', lineWidth: 1});
+                    drawConnectors(Els.ctx, lm, HAND_CONNECTIONS, {color: 'rgba(99, 230, 190, 0.22)', lineWidth: 1.2});
                 }
                 lm.forEach(pt => {
                     Els.ctx.beginPath();
-                    Els.ctx.arc(pt.x * Els.canvas.width, pt.y * Els.canvas.height, 6, 0, 2*Math.PI);
-                    Els.ctx.fillStyle = 'rgba(125, 211, 252, 0.2)'; Els.ctx.fill();
+                    Els.ctx.arc(pt.x * Els.canvas.width, pt.y * Els.canvas.height, 5.5, 0, 2*Math.PI);
+                    Els.ctx.fillStyle = 'rgba(99, 230, 190, 0.2)'; Els.ctx.fill();
                     Els.ctx.beginPath();
-                    Els.ctx.arc(pt.x * Els.canvas.width, pt.y * Els.canvas.height, 2.5, 0, 2*Math.PI);
-                    Els.ctx.fillStyle = '#FFFFFF'; Els.ctx.fill();
+                    Els.ctx.arc(pt.x * Els.canvas.width, pt.y * Els.canvas.height, 2.2, 0, 2*Math.PI);
+                    Els.ctx.fillStyle = '#63E6BE'; Els.ctx.fill();
                 });
             }
             Els.ctx.restore();
@@ -639,12 +640,12 @@ const RenderEngine = {
             const threshold = Math.max(Els.canvas.width, Els.canvas.height) * 0.04;
             Els.ctx.beginPath();
             Els.ctx.arc(State.hand.cx, State.hand.cy, threshold, 0, 2*Math.PI);
-            Els.ctx.strokeStyle = State.hand.isPinched ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 255, 255, 0.2)';
-            Els.ctx.lineWidth = State.hand.isPinched ? 3 : 1;
+            Els.ctx.strokeStyle = State.hand.isPinched ? 'rgba(99, 230, 190, 0.9)' : 'rgba(99, 230, 190, 0.25)';
+            Els.ctx.lineWidth = State.hand.isPinched ? 2.5 : 1;
             Els.ctx.stroke();
             Els.ctx.beginPath();
             Els.ctx.arc(State.hand.cx, State.hand.cy, 3, 0, 2*Math.PI);
-            Els.ctx.fillStyle = State.hand.isPinched ? '#F5F5F3' : 'rgba(255, 255, 255, 0.4)';
+            Els.ctx.fillStyle = State.hand.isPinched ? '#63E6BE' : 'rgba(99, 230, 190, 0.45)';
             Els.ctx.fill();
         }
         

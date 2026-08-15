@@ -1,35 +1,51 @@
 /* ═══════════════════════════════════════════════════════════
-   CYBER_PUZZLE.AI — Premium UI
-   Design system: sophisticated neutral palette + electric cyan
+   CYBER_PUZZLE.AI — Premium Hardware & Creative Tech UI
+   Design system: Deep charcoal surfaces + Mint & Warm Amber
    ═══════════════════════════════════════════════════════════ */
 
 /* ─── Design Tokens ─────────────────────────────────────── */
 :root {
     /* Surfaces */
-    --bg:           #0C0D0F;
-    --surface-1:    #131416;
-    --surface-2:    #1A1C1F;
-    --surface-3:    #222428;
+    --bg:           #0B0D0E;
+    --bg-gradient:  radial-gradient(ellipse at 50% 0%, #15191C 0%, #0B0D0E 75%);
+    --surface-1:    #101315;
+    --surface-2:    #15191B;
+    --surface-3:    #1A1F21;
+    --surface-hover:#22282B;
 
     /* Text */
-    --text-primary:   #F0EFE9;
-    --text-secondary: rgba(240, 239, 233, 0.45);
-    --text-tertiary:  rgba(240, 239, 233, 0.25);
+    --text-primary:   #F3F5F4;
+    --text-secondary: #9AA3A1;
+    --text-tertiary:  #68716F;
 
-    /* Accent — electric cyan, used sparingly */
-    --accent:         #22D3EE;
-    --accent-dim:     rgba(34, 211, 238, 0.12);
-    --accent-border:  rgba(34, 211, 238, 0.25);
+    /* Primary Accent — Mint (#63E6BE) */
+    --accent:         #63E6BE;
+    --accent-dim:     rgba(99, 230, 190, 0.12);
+    --accent-border:  rgba(99, 230, 190, 0.28);
+    --accent-glow:    0 0 20px rgba(99, 230, 190, 0.15);
+
+    /* Secondary Accent — Warm Amber (#F5B84B, Primary CTA & Capture) */
+    --amber:          #F5B84B;
+    --amber-dim:      rgba(245, 184, 75, 0.14);
+    --amber-border:   rgba(245, 184, 75, 0.35);
+    --amber-hover:    #FFC662;
+    --amber-glow:     0 2px 12px rgba(245, 184, 75, 0.2);
+
+    /* Status Colors */
+    --success:        #63E6BE;
+    --error:          #FF6B6B;
+    --error-dim:      rgba(255, 107, 107, 0.12);
+    --error-border:   rgba(255, 107, 107, 0.28);
 
     /* Borders */
-    --border:         rgba(255, 255, 255, 0.07);
-    --border-strong:  rgba(255, 255, 255, 0.12);
+    --border:         rgba(255, 255, 255, 0.08);
+    --border-strong:  rgba(255, 255, 255, 0.14);
 
     /* Shadows */
-    --shadow-sm:   0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.2);
-    --shadow-md:   0 4px 16px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.3);
-    --shadow-lg:   0 12px 40px rgba(0,0,0,0.6), 0 4px 12px rgba(0,0,0,0.4);
-    --shadow-xl:   0 24px 64px rgba(0,0,0,0.7);
+    --shadow-sm:   0 1px 3px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.3);
+    --shadow-md:   0 4px 16px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.4);
+    --shadow-lg:   0 12px 40px rgba(0,0,0,0.7), 0 4px 12px rgba(0,0,0,0.5);
+    --shadow-xl:   0 24px 64px rgba(0,0,0,0.85);
 
     /* Radii */
     --r-xs:  4px;
@@ -43,10 +59,8 @@
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
     --ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
 
-    /* Header height — referenced for layout calculations */
+    /* Header height */
     --header-h: 56px;
-
-    /* Camera sidebar width */
     --sidebar-w: 280px;
 }
 
@@ -85,7 +99,8 @@ body {
     padding-bottom: env(safe-area-inset-bottom, 0px);
     padding-left: env(safe-area-inset-left, 0px);
     padding-right: env(safe-area-inset-right, 0px);
-    background: var(--bg);
+    background: var(--bg-gradient);
+    background-attachment: fixed;
     color: var(--text-primary);
 }
 
@@ -113,7 +128,7 @@ video#input-video {
     inset: 0;
     pointer-events: none;
     z-index: 9999;
-    opacity: 0.025;
+    opacity: 0.02;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     background-size: 200px 200px;
 }
@@ -132,7 +147,7 @@ video#input-video {
     position: relative;
     z-index: 200;
     height: var(--header-h);
-    background: rgba(12, 13, 15, 0.88);
+    background: rgba(16, 19, 21, 0.92);
     backdrop-filter: blur(24px) saturate(1.4);
     -webkit-backdrop-filter: blur(24px) saturate(1.4);
     border-bottom: 1px solid var(--border);
@@ -159,7 +174,7 @@ video#input-video {
 }
 
 .logo-icon {
-    opacity: 0.9;
+    opacity: 0.95;
     flex-shrink: 0;
 }
 
@@ -172,8 +187,8 @@ video#input-video {
 }
 
 .logo-accent {
-    color: var(--text-secondary);
-    font-weight: 400;
+    color: var(--accent);
+    font-weight: 500;
 }
 
 /* ─── HUD Stats ──────────────────────────────────────────── */
@@ -186,6 +201,7 @@ video#input-video {
     border-radius: var(--r-md);
     overflow: hidden;
     flex-shrink: 0;
+    box-shadow: var(--shadow-sm);
 }
 
 .stat-item {
@@ -283,7 +299,8 @@ video#input-video {
 /* Ghost / neutral icon button */
 .btn-ghost,
 .btn-icon {
-    background: transparent;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
     color: var(--text-secondary);
     padding: 0;
     width: 34px;
@@ -291,12 +308,15 @@ video#input-video {
     border-radius: var(--r-sm);
     position: relative;
     overflow: visible;
+    box-shadow: var(--shadow-sm);
 }
 
 .btn-ghost:hover:not(:disabled),
 .btn-icon:hover:not(:disabled) {
-    background: var(--surface-3);
+    background: var(--surface-hover);
+    border-color: rgba(99, 230, 190, 0.3);
     color: var(--text-primary);
+    box-shadow: 0 0 12px rgba(99, 230, 190, 0.08);
 }
 
 /* Secondary */
@@ -308,22 +328,30 @@ video#input-video {
 }
 
 .btn-secondary:hover:not(:disabled) {
-    background: var(--surface-3);
+    background: var(--surface-hover);
     border-color: var(--border-strong);
+    color: #ffffff;
 }
 
-/* Primary */
+/* Primary — Warm Amber Accent (#F5B84B) */
 .btn-primary {
-    background: var(--text-primary);
-    color: var(--bg);
+    background: var(--amber-dim);
+    border: 1px solid var(--amber-border);
+    color: var(--amber);
     font-weight: 600;
-    box-shadow: 0 2px 8px rgba(240, 239, 233, 0.08);
+    box-shadow: var(--amber-glow);
 }
 
 .btn-primary:hover:not(:disabled) {
-    background: #ffffff;
-    box-shadow: 0 4px 16px rgba(240, 239, 233, 0.15);
+    background: var(--amber);
+    border-color: var(--amber-hover);
+    color: #0B0D0E;
+    box-shadow: 0 4px 18px rgba(245, 184, 75, 0.35);
     transform: translateY(-1px);
+}
+
+.btn-primary svg {
+    stroke: currentColor;
 }
 
 .btn-sm {
@@ -343,7 +371,7 @@ video#input-video {
     padding: 0 28px 0 10px;
     height: 34px;
     background: var(--surface-2)
-        url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='rgba(240,239,233,0.4)' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")
+        url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='rgba(243,245,244,0.5)' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")
         no-repeat right 10px center;
     border: 1px solid var(--border);
     color: var(--text-secondary);
@@ -354,11 +382,12 @@ video#input-video {
     cursor: pointer;
     outline: none;
     transition: background 0.15s, border-color 0.15s, color 0.15s;
+    box-shadow: var(--shadow-sm);
 }
 
 .select-ctrl:hover {
-    background-color: var(--surface-3);
-    border-color: var(--border-strong);
+    background-color: var(--surface-hover);
+    border-color: rgba(99, 230, 190, 0.3);
     color: var(--text-primary);
 }
 
@@ -556,7 +585,7 @@ canvas#output-canvas.visible {
     transform-origin: 50% 50%;
     stroke-dasharray: 175.93; /* 2π × 28 — matches JS constant */
     stroke-dashoffset: 175.93;
-    stroke: var(--accent);
+    stroke: var(--amber);
 }
 
 .pinch-dot {
@@ -564,8 +593,9 @@ canvas#output-canvas.visible {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--accent);
-    opacity: 0.7;
+    background: var(--amber);
+    box-shadow: 0 0 10px rgba(245, 184, 75, 0.6);
+    opacity: 0.85;
     animation: pulse-dot 1.6s var(--ease-in-out) infinite;
 }
 
@@ -632,8 +662,9 @@ canvas#output-canvas.visible {
     gap: 12px;
     padding: clamp(14px, 3vh, 36px) clamp(14px, 3vw, 32px);
     text-align: center;
-    /* Slightly lighter than panel to create visible layering */
-    background: rgba(19, 21, 24, 0.94);
+    /* Clean elevated surface with subtle backdrop blur */
+    background: rgba(21, 25, 27, 0.95);
+    border: 1px solid var(--border);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     overflow-y: auto;
@@ -654,14 +685,14 @@ canvas#output-canvas.visible {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-secondary);
+    color: var(--accent);
     margin-bottom: 4px;
 }
 
 .overlay-card-icon.error-icon {
-    background: rgba(248, 113, 113, 0.08);
-    border-color: rgba(248, 113, 113, 0.2);
-    color: #F87171;
+    background: var(--error-dim);
+    border-color: var(--error-border);
+    color: var(--error);
 }
 
 .overlay-title {
@@ -679,7 +710,7 @@ canvas#output-canvas.visible {
 }
 
 .error-text {
-    color: #F87171;
+    color: var(--error);
 }
 
 .margin-top {
@@ -715,7 +746,7 @@ canvas#output-canvas.visible {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-tertiary);
+    color: var(--accent);
     flex-shrink: 0;
 }
 
@@ -726,8 +757,8 @@ canvas#output-canvas.visible {
     gap: 10px;
     width: 100%;
     max-width: 320px;
-    background: rgba(34, 211, 238, 0.04);
-    border: 1px solid rgba(34, 211, 238, 0.16);
+    background: rgba(99, 230, 190, 0.04);
+    border: 1px solid rgba(99, 230, 190, 0.18);
     border-radius: var(--r-md);
     padding: 10px 12px;
     text-align: left;
@@ -775,7 +806,7 @@ canvas#output-canvas.visible {
     width: 40px;
     height: 40px;
     border: 2.5px solid var(--border-strong);
-    border-top-color: var(--text-primary);
+    border-top-color: var(--accent);
     border-radius: 50%;
     animation: spin 0.9s linear infinite;
     margin-bottom: 8px;
@@ -816,7 +847,7 @@ canvas#output-canvas.visible {
     position: absolute;
     inset: 0;
     z-index: 100;
-    background: rgba(12, 13, 15, 0.85);
+    background: rgba(11, 13, 14, 0.88);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     display: flex;
